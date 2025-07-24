@@ -1,9 +1,6 @@
 google-cloud-storage
 torch
-torchaudio==2.3.0
-transformers==4.43.0
-datasets==2.19.0
+transformers
 scikit-learn
 pandas
-jiwer
 tqdm
