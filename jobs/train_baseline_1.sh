@@ -1,12 +1,26 @@
 #!/bin/bash
-#SBATCH -p compute                  # Specify partition [Compute/Memory/GPU]
-#SBATCH -N 1 -c 128   			    # Specify number of nodes and processors per task
-#SBATCH --ntasks-per-node=1		    # Specify tasks per node
-#SBATCH -t 120:00:00                # Specify maximum time limit (hour: minute: second)
-#SBATCH -A xxxxxxxx                 # Specify project name
-#SBATCH -J xxxxxx                  # Specify job name
+#SBATCH --job-name=train_baseline_1
+#SBATCH --output=logs/train_baseline_%j.out
+#SBATCH --error=logs/train_baseline_%j.err
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:4
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=8
+#SBATCH --time=48:00:00
 
-module load Mamba/23.11.0-0         # Load the conda module
-conda activate pytorch-2.2.2		# Activate your environment
+#SBATCH --account=xxxxxxxxx             # <-- Replace with your account name
 
-python3 basic-multi-gpu-pytorch.py  # Run your program or executable code
+module load Mamba/23.11.0
+conda activate pytorch-2.2.2
+
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+DATA_DIR="/path/to/dataset"             # <-- Replace with the dataset path
+
+torchrun \
+    --nnodes=${SLURM_NNODES} \
+    --nproc_per_node=${SLURM_NTASKS_PER_NODE} \
+    --node_rank=${SLURM_NODEID} \
+    scripts/train_baseline_1.py \
+        --data ${DATA_DIR}
