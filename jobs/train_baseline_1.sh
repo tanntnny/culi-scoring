@@ -18,7 +18,7 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 DATA_DIR="/path/to/dataset"             # <-- Replace with the dataset path
 
-torchrun \
+python3 -m torch.distributed.run \
     --nnodes=${SLURM_NNODES} \
     --nproc_per_node=${SLURM_NTASKS_PER_NODE} \
     --node_rank=${SLURM_NODEID} \
