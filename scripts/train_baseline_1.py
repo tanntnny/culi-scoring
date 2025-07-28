@@ -1,18 +1,24 @@
+import argparse
+import logging
+import math
 import os
 from io import BytesIO
-import math
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-from torch.nn.parallel import DistributedDataParallel as DDP
-from transformers import Wav2Vec2Model, Wav2Vec2Processor, get_cosine_schedule_with_warmup
-from sklearn.model_selection import train_test_split
-from pydub import AudioSegment
 import torchaudio
-import logging
-from datetime import datetime
+from pydub import AudioSegment
+from sklearn.model_selection import train_test_split
+from torch import nn
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader, Dataset
+from transformers import (
+    Wav2Vec2Model,
+    Wav2Vec2Processor,
+    get_cosine_schedule_with_warmup
+)
+
 
 # ------------------- Utilities -------------------
 
@@ -149,19 +155,6 @@ class SpeechModel(nn.Module):
         logits = self.metric_head(z)
         return logits
 
-# ------------------- Train-Test Split -------------------
-
-audio_path = "dataset/audio"
-logger.info("Preparing train/test split.")
-data_config = create_data_config(audio_path)
-train_data_config, eval_data_config = train_test_split(
-    data_config,
-    test_size=0.2,
-    random_state=42,
-    stratify=data_config['label']
-)
-logger.info(f"Train samples: {len(train_data_config)}, Eval samples: {len(eval_data_config)}")
-
 # ------------------- Distributed Training Setup -------------------
 
 def setup_ddp():
@@ -207,10 +200,17 @@ def save_model(model, epoch, eval_acc):
 # ------------------- Main -------------------
 
 def main():
+    # Parse CLI arguments
+    parser = argparse.ArgumentParser(description="Train a baseline model on ICNALE-SM dataset.")
+    parser.add_argument("--data", type=str, required=True, help="Path to the ICNALE-SM dataset directory.")
+    args = parser.parse_args()
+
+    # Initialize DDP setup
     logger.info("Starting main training loop.")
     local_rank = setup_ddp()
     device = f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu"
 
+    # Define Hyperparameters
     NUM_CLASSES = len(cefr_label)
     K_PROTOTYPES = 3
     BATCH_SIZE = 8
@@ -218,12 +218,22 @@ def main():
     LR = 5e-5
     WARMUP_FRAC = 0.1
 
+    # Prepare dataset configuration
+    data_config = create_data_config(args.data)
+    train_data_config, eval_data_config = train_test_split(
+        data_config,
+        test_size=0.2,
+        random_state=42
+    )
+
+    # Create datasets and loaders
     train_dataset = ICNALE_SM_Dataset(train_data_config)
     eval_dataset = ICNALE_SM_Dataset(eval_data_config)
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=train_sampler, collate_fn=collate_fn)
     eval_loader = DataLoader(eval_dataset, batch_size=BATCH_SIZE, collate_fn=collate_fn)
 
+    # Initialize model, criterion, optimiser, scaler, and scheduler
     model = SpeechModel(num_classes=NUM_CLASSES, k=K_PROTOTYPES).to(device)
     model = DDP(model, device_ids=[local_rank])
     criterion = nn.CrossEntropyLoss()
@@ -235,6 +245,7 @@ def main():
         num_training_steps=EPOCHS * len(train_loader)
     )
 
+    # Train and evaluate
     best_eval_acc = 0.0
     for epoch in range(EPOCHS):
         logger.info(f"Epoch {epoch+1}/{EPOCHS} started.")
