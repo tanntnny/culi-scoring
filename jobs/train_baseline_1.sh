@@ -16,7 +16,7 @@ conda activate pytorch-2.2.2
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-DATA_DIR="/path/to/dataset"             # <-- Replace with the dataset path
+DATA_DIR="datasets/SM/ICNALE_SM_Audio"             # <-- Replace with the dataset path
 
 python3 -m torch.distributed.run \
     --nnodes=${SLURM_NNODES} \
