@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 logger.info("Loading Wav2Vec2 processor and CEFR labels.")
-wav2vec_processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base")
+wav2vec_processor = Wav2Vec2Processor.from_pretrained("models/wav2vec2-processor")
 try:
     cefr_label = pd.read_csv("assets/cefr_label.csv")
 except FileNotFoundError:
@@ -150,7 +150,7 @@ class PrototypicalClassifier(nn.Module):
 class SpeechModel(nn.Module):
     def __init__(self, num_classes: int, k: int = 3):
         super().__init__()
-        self.encoder = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-base")
+        self.encoder = Wav2Vec2Model.from_pretrained("models/wav2vec2-model")
         hidden_size = self.encoder.config.hidden_size
         self.pooler = MeanPooler()
         self.mlp = nn.Sequential(
