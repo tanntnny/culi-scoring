@@ -4,19 +4,40 @@
 #SBATCH --error=logs/train_baseline_%j.err
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:4
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=4
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=16
 #SBATCH --time=48:00:00
 
 #SBATCH --account=xxxxxxxxx # <-- Replace with your account name
 
-module load xxxxxxxxxx # <-- Replace with your module name
-conda activate xxxxxxxxxxx # <-- Replace with your environment name
+set -euo pipefail
 
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+# ---- Environment / modules ----
+module load Mamba/23.11.0-0
+conda activate pytorch-2.2.2
 
-DATA_DIR="datasets/SM/ICNALE_SM_Audio" # <-- Replace with the dataset path
+# ---- Distributed env ----
+export MASTER_PORT=$((10000 + ${SLURM_JOBID: -4}))
+echo "MASTER_PORT=${MASTER_PORT}"
 
-srun python3 scripts/train_baseline_1.py \
-    --data ${DATA_DIR}
+export MASTER_ADDR=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)
+echo "MASTER_ADDR=${MASTER_ADDR}"
+
+export WORLD_SIZE=${SLURM_NTASKS}
+echo "WORLD_SIZE=${WORLD_SIZE}"
+
+export SLURM_GPUS_ON_NODE="${SLURM_GPUS_ON_NODE:-$SLURM_NTASKS_PER_NODE}"
+echo "SLURM_GPUS_ON_NODE=${SLURM_GPUS_ON_NODE}"
+
+export NCCL_DEBUG=warn
+export NCCL_ASYNC_ERROR_HANDLING=1
+
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+
+# ---- Paths / args ----
+DATA_DIR=datasets/SM/ICNALE_SM_Audio
+SCRIPT=scripts/train_baseline_1.py
+
+echo "Launching with srun..."
+srun python "$SCRIPT" --data "$DATA_DIR"
