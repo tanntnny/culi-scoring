@@ -9,14 +9,14 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --time=48:00:00
 
-#SBATCH --account=xxxxxxxxx             # <-- Replace with your account name
+#SBATCH --account=xxxxxxxxx # <-- Replace with your account name
 
-module load Mamba/23.11.0
-conda activate pytorch-2.2.2
+module load xxxxxxxxxx # <-- Replace with your module name
+conda activate xxxxxxxxxxx # <-- Replace with your environment name
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-DATA_DIR="datasets/SM/ICNALE_SM_Audio"             # <-- Replace with the dataset path
+DATA_DIR="datasets/SM/ICNALE_SM_Audio" # <-- Replace with the dataset path
 
 python3 -m torch.distributed.run \
     --nnodes=${SLURM_NNODES} \
