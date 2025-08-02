@@ -2,13 +2,11 @@ import argparse
 import logging
 import math
 import os
-from io import BytesIO
 
 import numpy as np
 import pandas as pd
 import torch
 import torchaudio
-from pydub import AudioSegment
 from sklearn.model_selection import train_test_split
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -35,28 +33,39 @@ logger = logging.getLogger(__name__)
 
 logger.info("Loading Wav2Vec2 processor and CEFR labels.")
 wav2vec_processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base")
-cefr_label = pd.read_csv("assets/cefr_label.csv")
+try:
+    cefr_label = pd.read_csv("assets/cefr_label.csv")
+except FileNotFoundError:
+    logger.error("File 'assets/cefr_label.csv' not found. Please ensure the file exists and is accessible.")
+    exit(1)
 
 # Recursively find files in a folder tree
-def dig_folder(file):
+def dig_folder(file, valid_exts=[".mp3", ".wav", ".flac"]):
     returning = []
     if os.path.isdir(file):
         for f in os.listdir(file):
-            returning.extend(dig_folder(os.path.join(file, f)))
+            returning.extend(dig_folder(os.path.join(file, f), valid_exts))
     else:
-        returning.append(file)
+        ext = os.path.splitext(file)[1].lower()
+        if ext in valid_exts:
+            returning.append(file)
+        else:
+            logger.debug(f"Skipping non-audio file: {file}")
     return returning
+
 
 # Convert MP3 to tensor
 def mp3_to_tensor(mp3_path, frame_rate=16_000):
-    logger.debug(f"Converting {mp3_path} to tensor.")
-    audio = AudioSegment.from_mp3(mp3_path)
-    audio = audio.set_frame_rate(frame_rate).set_channels(1)
-    buf = BytesIO()
-    audio.export(buf, format="wav")
-    buf.seek(0)
-    waveform, sample_rate = torchaudio.load(buf)
-    return waveform, sample_rate
+    logger.debug(f"Loading {mp3_path} with torchaudio.")
+    waveform, sample_rate = torchaudio.load(mp3_path)
+    if waveform.shape[0] > 1:
+        waveform = torch.mean(waveform, dim=0, keepdim=True)
+    if sample_rate != frame_rate:
+        resampler = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=frame_rate)
+        waveform = resampler(waveform)
+        sample_rate = frame_rate
+    return waveform.squeeze().numpy(), sample_rate
+
 
 # Create a data configuration DataFrame
 def create_data_config(prefix):
@@ -81,24 +90,26 @@ def create_data_config(prefix):
 class ICNALE_SM_Dataset(Dataset):
     def __init__(self, data_config):
         logger.info(f"Initializing dataset with {len(data_config)} samples.")
-        self.samples = [] # list of tuples (waveform, label)
+        self.samples = []
         for _, row in data_config.iterrows():
             path, label = row['path'], row['label']
-            try:
-                waveform, _ = mp3_to_tensor(path)
-                waveform = waveform.squeeze().numpy()
-                value = cefr_label.loc[cefr_label["CEFR Level"] == label, "label"].values
-                if len(value) > 0:
-                    label = value[0]
-                    self.samples.append((waveform, label))
-                else:
-                    logger.warning(f"Label '{label}' not found in CEFR label mapping for file: {path}")
-            except Exception as e:
-                logger.warning(f"Error processing file {path}: {e}")
+            value = cefr_label.loc[cefr_label["CEFR Level"] == label, "label"].values
+            if len(value) > 0:
+                label = value[0]
+                self.samples.append((path, label))
+            else:
+                logger.warning(f"Label '{label}' not found in CEFR label mapping for file: {path}")
     def __len__(self):
         return len(self.samples)
     def __getitem__(self, idx):
-        return self.samples[idx]
+        path, label = self.samples[idx]
+        try:
+            waveform, _ = mp3_to_tensor(path)
+        except Exception as e:
+            logger.warning(f"Error loading audio {path}: {e}")
+            waveform = np.zeros(16000)
+        return waveform, label
+
     
 def collate_fn(batch):
     waveforms, labels = zip(*batch)
@@ -169,7 +180,10 @@ def setup_ddp():
 
 def run_epoch(model, loader, criterion, optimiser=None, scaler=None, device="cuda"):
     is_train = optimiser is not None
-    model.train() if is_train else model.eval()
+    if is_train:
+        model.train()
+    else:
+        model.eval()
     total_loss, correct, n = 0.0, 0, 0
     for batch_idx, batch in enumerate(loader):
         batch = {k: v.to(device) for k, v in batch.items()}
@@ -194,7 +208,7 @@ def run_epoch(model, loader, criterion, optimiser=None, scaler=None, device="cud
     return total_loss / n, correct / n
 def save_model(model, epoch, eval_acc):
     save_path = f"checkpoints/model_epoch{epoch}_acc{eval_acc:.4f}.pt"
-    torch.save(model.state_dict(), save_path)
+    torch.save(model.module.state_dict(), save_path)
     logger.info(f"Model saved to {save_path}")
 
 # ------------------- Main -------------------
@@ -252,15 +266,22 @@ def main():
         train_sampler.set_epoch(epoch)
         train_loss, train_acc = run_epoch(model, train_loader, criterion, optimiser, scaler, device)
         eval_loss, eval_acc = run_epoch(model, eval_loader, criterion, None, None, device)
-        logger.info(f"Epoch {epoch+1}: Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f}, Eval Loss={eval_loss:.4f}, Eval Acc={eval_acc:.4f}")
-        scheduler.step()
+        logger.info(
+            f"Epoch {epoch+1}: Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f}, "
+            f"Eval Loss={eval_loss:.4f}, Eval Acc={eval_acc:.4f}"
+        )
+
         if eval_acc > best_eval_acc:
             best_eval_acc = eval_acc
             save_model(model, epoch+1, eval_acc)
             logger.info("New best model saved.")
-        eval_loss, eval_acc = run_epoch(model, eval_loader, criterion, None, None, device)
-        print(f"Epoch {epoch+1}/{EPOCHS} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} | Eval Loss: {eval_loss:.4f} | Eval Acc: {eval_acc:.4f}")
+
+        print(
+            f"Epoch {epoch+1}/{EPOCHS} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} "
+            f"| Eval Loss: {eval_loss:.4f} | Eval Acc: {eval_acc:.4f}"
+        )
         scheduler.step()
+
 
 if __name__ == "__main__":
     main()
