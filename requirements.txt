@@ -1,7 +1,7 @@
 google-cloud-storage
-torch
-transformers
+torch>=2.0.0
+torchaudio
+transformers>=4.36.0
 scikit-learn
 pandas
-tqdm
-pydub
+numpy
