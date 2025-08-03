@@ -27,22 +27,6 @@ logger.addHandler(logging.StreamHandler())  # Console handler; per-rank file han
 
 # These globals are populated in main() after rank is known
 wav2vec_processor = None
-cefr_label = None
-
-# Recursively find files in a folder tree
-def dig_folder(file, valid_exts=[".mp3", ".wav", ".flac"]):
-    returning = []
-    if os.path.isdir(file):
-        for f in os.listdir(file):
-            returning.extend(dig_folder(os.path.join(file, f), valid_exts))
-    else:
-        ext = os.path.splitext(file)[1].lower()
-        if ext in valid_exts:
-            returning.append(file)
-        else:
-            logger.debug(f"Skipping non-audio file: {file}")
-    return returning
-
 
 # Convert audio file to tensor
 def audio_to_tensor(path, frame_rate=16_000):
@@ -54,24 +38,6 @@ def audio_to_tensor(path, frame_rate=16_000):
         resampler = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=frame_rate)
         waveform = resampler(waveform)
     return waveform.squeeze().numpy(), frame_rate
-
-
-# Create a data configuration DataFrame
-def create_data_config(prefix, cefr_label_df):
-    logger.info(f"Creating data config from {prefix}")
-    paths, labels = [], []
-    for f in dig_folder(prefix):
-        basename = os.path.basename(f)
-        label = basename.split("_")[-2] + "_" + basename.split("_")[-1][0]
-        if label in cefr_label_df["CEFR Level"].values:
-            paths.append(f)
-            labels.append(label)
-    df = pd.DataFrame({
-        'path': paths,
-        'label': labels
-    })
-    logger.info(f"Found {len(df)} audio files for training/evaluation.")
-    return df
 
 # ------------------- Dataset -------------------
 
@@ -217,7 +183,8 @@ def save_model(model, epoch, eval_acc):
 def main():
     # Parse CLI arguments
     parser = argparse.ArgumentParser(description="Train a baseline model on ICNALE-SM dataset (SLURM DDP).")
-    parser.add_argument("--data", type=str, required=True, help="Path to the ICNALE-SM dataset directory.")
+    parser.add_argument("--train-data", type=str, required=True, help="Path to the ICNALE-SM training dataset configuration.")
+    parser.add_argument("--val-data", type=str, required=True, help="Path to the ICNALE-SM validation dataset configuration.")
     args = parser.parse_args()
 
     # Initialize DDP using SLURM-style env vars
