@@ -36,8 +36,9 @@ export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 # ---- Paths / args ----
-DATA_DIR=datasets/SM/ICNALE_SM_Audio
+TRAIN_DATA=datasets/SM/ICNALE_SM_Audio/train_config.csv
+VAL_DATA=datasets/SM/ICNALE_SM_Audio/val_config.csv
 SCRIPT=scripts/train_baseline_1.py
 
 echo "Launching with srun..."
-srun python "$SCRIPT" --data "$DATA_DIR"
+srun python "$SCRIPT" --train-data "$TRAIN_DATA" --val-data "$VAL_DATA"
