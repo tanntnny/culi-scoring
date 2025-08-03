@@ -39,10 +39,6 @@ def audio_to_tensor(path, frame_rate=16_000):
         waveform = resampler(waveform)
     return waveform.squeeze().numpy(), frame_rate
 
-def log_cuda_mem(prefix=""):
-    if torch.cuda.is_available():
-        logger.info(f"{prefix} CUDA memory summary:\n{torch.cuda.memory_summary(abbreviated=True)}")
-
 # ------------------- Dataset -------------------
 
 class ICNALE_SM_Dataset(Dataset):
@@ -211,7 +207,6 @@ def main():
     # Initialize DDP using SLURM-style env vars
     world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
     is_main = rank == 0
-    log_cuda_mem("After model/DDP creation:")
 
     # Rank-aware logging (separate file per rank)
     log_dir = "logs"
@@ -299,7 +294,6 @@ def main():
     for epoch in range(EPOCHS):
         if is_main:
             logger.info(f"Epoch {epoch+1}/{EPOCHS} started.")
-            log_cuda_mem("Before training:")
 
         train_sampler.set_epoch(epoch)
         val_sampler.set_epoch(epoch)
@@ -310,13 +304,10 @@ def main():
         val_loss = 0.0
         val_acc = 0.0
 
-        torch.cuda.empty_cache()
-
         with torch.no_grad():
             if is_main:
                 val_loss, val_acc = run_epoch(model, val_loader, criterion, None, None, device)
                 torch.cuda.empty_cache()
-                log_cuda_mem("After validation:")
         tensor_metrics = torch.tensor([val_loss, val_acc], dtype=torch.float32, device=device)
         dist.broadcast(tensor_metrics, src=0)
         val_loss, val_acc = tensor_metrics.tolist()
