@@ -23,11 +23,14 @@ def create_data_config(prefix, cefr_label_df):
     print(f"Creating data config from {prefix}")
     paths, labels = [], []
     for f in dig_folder(prefix):
-        basename = os.path.basename(f)
-        label = basename.split("_")[-2] + "_" + basename.split("_")[-1][0]
-        if label in cefr_label_df["CEFR Level"].values:
-            paths.append(f)
-            labels.append(label)
+        try:
+            basename = os.path.basename(f)
+            label = basename.split("_")[-2] + "_" + basename.split("_")[-1][0]
+            if label in cefr_label_df["CEFR Level"].values:
+                paths.append(f)
+                labels.append(label)
+        except Exception as e:
+            print(f"[Error] Error processing file {f}: {e}")
     df = pd.DataFrame({
         'path': paths,
         'label': labels
@@ -57,6 +60,7 @@ def main():
     train_config.to_csv(os.path.join(saving_path, "train_config.csv"), index=False)
     val_config.to_csv(os.path.join(saving_path, "val_config.csv"), index=False)
 
+    print(f"[Done] Data configuration saved to {saving_path}")
 
 if __name__ == "__main__":
     main()
