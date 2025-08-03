@@ -74,7 +74,14 @@ def collate_fn(batch):
         sampling_rate=16_000,
         return_tensors="pt",
         padding=True,
+        return_attention_mask=True,
     )
+
+    if "attention_mask" not in proc_out:
+        input_values = proc_out["input_values"]  # shape: (batch, seq)
+        proc_out["attention_mask"] = torch.ones(
+            input_values.shape, dtype=torch.long
+        )
     proc_out["labels"] = torch.tensor(labels, dtype=torch.long)
     return proc_out
 
