@@ -39,6 +39,8 @@ def audio_to_tensor(path, frame_rate=16_000):
         waveform = resampler(waveform)
     return waveform.squeeze().numpy(), frame_rate
 
+
+
 # ------------------- Dataset -------------------
 
 class ICNALE_SM_Dataset(Dataset):
@@ -124,9 +126,19 @@ class SpeechModel(nn.Module):
         )
         self.metric_head = PrototypicalClassifier(embed_dim=256, num_classes=num_classes, k=k)
 
+    def _get_feature_level_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
+        x = attention_mask.unsqueeze(1).float()  # (B,1,T)
+        for conv in self.encoder.feature_extractor.conv_layers:
+            x = conv(x)
+        mask = (x.abs() > 0).any(dim=1).long()  # (B, T_feat)
+        return mask
+
+
     def forward(self, input_values: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         out = self.encoder(input_values=input_values, attention_mask=attention_mask)
-        pooled = out.last_hidden_state.mean(dim=1)
+        hidden = out.last_hidden_state  # (B, T_feat, H)
+        feat_mask = self._get_feature_level_mask(attention_mask)  # (B, T_feat)
+        pooled = self.pooler(hidden, feat_mask)
         z = self.mlp(pooled)
         logits = self.metric_head(z)
         return logits
@@ -280,7 +292,7 @@ def main():
     )
 
     # Train and evaluate
-    best_eval_acc = 0.0
+    best_val_acc = 0.0
     for epoch in range(EPOCHS):
         if is_main:
             logger.info(f"Epoch {epoch+1}/{EPOCHS} started.")
