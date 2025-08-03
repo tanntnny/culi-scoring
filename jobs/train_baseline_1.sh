@@ -14,6 +14,7 @@
 set -euo pipefail
 
 # ---- Environment / modules ----
+module load FFmpeg/6.0.1-cpeCray-23.03
 module load Mamba/23.11.0-0
 conda activate pytorch-2.2.2
 
