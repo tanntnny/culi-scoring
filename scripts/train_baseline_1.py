@@ -126,7 +126,7 @@ class SpeechModel(nn.Module):
 
     def forward(self, input_values: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         out = self.encoder(input_values=input_values, attention_mask=attention_mask)
-        pooled = self.pooler(out.last_hidden_state, attention_mask)
+        pooled = out.last_hidden_state.mean(dim=1)
         z = self.mlp(pooled)
         logits = self.metric_head(z)
         return logits
