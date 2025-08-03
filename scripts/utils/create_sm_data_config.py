@@ -46,9 +46,9 @@ def main():
     parser.add_argument("--save", type=str, required=True, help="Path to save the data configuration CSV file.")
     args = parser.parse_args()
 
-    prefix_dir = args["dir"]
-    cefr_labels_path = args["cefr_labels"]
-    saving_path = args["save"]
+    prefix_dir = args.dir
+    cefr_labels_path = args.cefr_labels
+    saving_path = args.save
 
     # Create data configuration
     data_config = create_data_config(prefix_dir, pd.read_csv(cefr_labels_path))
