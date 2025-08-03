@@ -221,20 +221,22 @@ def main():
     WARMUP_FRAC = 0.1
 
     # Prepare dataset configuration
-    data_config = create_data_config(args.data, cefr_label)
-    train_data_config, eval_data_config = train_test_split(
-        data_config, test_size=0.2, random_state=42
-    )
+    train_data_config = pd.read_csv(args.train_data)
+    val_data_config = pd.read_csv(args.val_data)
 
     # Create datasets and loaders
     train_dataset = ICNALE_SM_Dataset(train_data_config, cefr_label)
-    eval_dataset = ICNALE_SM_Dataset(eval_data_config, cefr_label)
+    val_dataset = ICNALE_SM_Dataset(val_data_config, cefr_label)
 
     num_workers = int(os.environ.get("SLURM_CPUS_PER_TASK", "4"))
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_dataset, num_replicas=world_size, rank=rank, shuffle=True
     )
+    val_sampler = torch.utils.data.distributed.DistributedSampler(
+        val_dataset, num_replicas=world_size, rank=rank, shuffle=False
+    )
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=BATCH_SIZE,
@@ -244,14 +246,11 @@ def main():
         pin_memory=True,
         drop_last=False,
     )
-    # Use a distributed sampler for eval to avoid duplicated work (no shuffle)
-    eval_sampler = torch.utils.data.distributed.DistributedSampler(
-        eval_dataset, num_replicas=world_size, rank=rank, shuffle=False
-    )
-    eval_loader = DataLoader(
-        eval_dataset,
+    
+    val_loader = DataLoader(
+        val_dataset,
         batch_size=BATCH_SIZE,
-        sampler=eval_sampler,
+        sampler=val_sampler,
         collate_fn=collate_fn,
         num_workers=num_workers,
         pin_memory=True,
@@ -280,34 +279,34 @@ def main():
             logger.info(f"Epoch {epoch+1}/{EPOCHS} started.")
 
         train_sampler.set_epoch(epoch)
-        eval_sampler.set_epoch(epoch)
+        val_sampler.set_epoch(epoch)
 
         train_loss, train_acc = run_epoch(model, train_loader, criterion, optimiser, scaler, device)
         scheduler.step()
 
-        eval_loss = 0.0
-        eval_acc = 0.0
+        val_loss = 0.0
+        val_acc = 0.0
         with torch.no_grad():
             if is_main:
-                eval_loss, eval_acc = run_epoch(model, eval_loader, criterion, None, None, device)
-        tensor_metrics = torch.tensor([eval_loss, eval_acc], dtype=torch.float32, device=device)
+                val_loss, val_acc = run_epoch(model, val_loader, criterion, None, None, device)
+        tensor_metrics = torch.tensor([val_loss, val_acc], dtype=torch.float32, device=device)
         dist.broadcast(tensor_metrics, src=0)
-        eval_loss, eval_acc = tensor_metrics.tolist()
+        val_loss, val_acc = tensor_metrics.tolist()
 
         if is_main:
             logger.info(
                 f"Epoch {epoch+1}: Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f}, "
-                f"Eval Loss={eval_loss:.4f}, Eval Acc={eval_acc:.4f}"
+                f"Val Loss={val_loss:.4f}, Val Acc={val_acc:.4f}"
             )
 
-            if eval_acc > best_eval_acc:
-                best_eval_acc = eval_acc
-                save_model(model, epoch+1, eval_acc)
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                save_model(model, epoch+1, val_acc)
                 logger.info("New best model saved.")
 
             print(
                 f"Epoch {epoch+1}/{EPOCHS} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} "
-                f"| Eval Loss: {eval_loss:.4f} | Eval Acc: {eval_acc:.4f}")
+                f"| Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
 
     dist.destroy_process_group()
 
