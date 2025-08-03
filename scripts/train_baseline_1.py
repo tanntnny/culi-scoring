@@ -232,7 +232,7 @@ def main():
     # Define Hyperparameters
     NUM_CLASSES = len(cefr_label)
     K_PROTOTYPES = 3
-    BATCH_SIZE = 8
+    BATCH_SIZE = 4
     EPOCHS = 10
     LR = 5e-5
     WARMUP_FRAC = 0.1
