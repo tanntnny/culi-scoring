@@ -205,9 +205,17 @@ def run_epoch(model, loader, criterion, optimiser=None, scaler=None, device="cud
     return total_loss / max(n, 1), correct / max(n, 1)
 
 
-def save_model(model, epoch, eval_acc):
-    save_path = f"checkpoints/model_epoch{epoch}_acc{eval_acc:.4f}.pt"
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+def get_next_run_dir(base_dir="runs"):
+    os.makedirs(base_dir, exist_ok=True)
+    existing = [d for d in os.listdir(base_dir) if d.startswith("run") and os.path.isdir(os.path.join(base_dir, d))]
+    run_nums = [int(d[3:]) for d in existing if d[3:].isdigit()]
+    next_num = max(run_nums, default=0) + 1
+    run_dir = os.path.join(base_dir, f"run{next_num}")
+    os.makedirs(run_dir, exist_ok=True)
+    return run_dir
+
+def save_model(model, epoch, eval_acc, run_dir):
+    save_path = os.path.join(run_dir, f"model_epoch{epoch}_acc{eval_acc:.4f}.pt")
     torch.save(model.module.state_dict(), save_path)
     logger.info(f"Model saved to {save_path}")
 
@@ -330,8 +338,14 @@ def main():
         optimiser, num_warmup_steps=warmup_steps, num_training_steps=total_steps
     )
 
+    # Prepare run directory
+    run_dir = get_next_run_dir()
+    if is_main:
+        logger.info(f"Saving all results to {run_dir}")
+
     # Train and evaluate
     best_val_acc = 0.0
+    metrics = []
     for epoch in range(EPOCHS):
         if is_main:
             logger.info(f"Epoch {epoch+1}/{EPOCHS} started.")
@@ -359,14 +373,30 @@ def main():
                 f"Val Loss={val_loss:.4f}, Val Acc={val_acc:.4f}"
             )
 
+            metrics.append({
+                "epoch": epoch+1,
+                "train_loss": train_loss,
+                "train_acc": train_acc,
+                "val_loss": val_loss,
+                "val_acc": val_acc
+            })
+
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
-                save_model(model, epoch+1, val_acc)
+                save_model(model, epoch+1, val_acc, run_dir)
                 logger.info("New best model saved.")
 
             print(
                 f"Epoch {epoch+1}/{EPOCHS} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} "
                 f"| Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+
+    # Save metrics to run directory
+    if is_main:
+        import json
+        metrics_path = os.path.join(run_dir, "metrics.json")
+        with open(metrics_path, "w") as f:
+            json.dump(metrics, f, indent=2)
+        logger.info(f"Metrics saved to {metrics_path}")
 
     dist.destroy_process_group()
 
