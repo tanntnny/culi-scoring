@@ -293,7 +293,7 @@ def main():
 
     # Loss Re-Weghting
     label_count = get_label_count(train_data_config, cefr_label).float()
-    label_count_pow = label_count.pow()
+    label_count_pow = label_count.pow(LW_ALPHA)
     lw_weights = label_count_pow / label_count_pow.sum()
     lw_weights = lw_weights / label_count
     lw_weights = lw_weights.to(local_rank)
