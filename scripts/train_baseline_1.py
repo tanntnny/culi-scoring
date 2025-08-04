@@ -39,6 +39,18 @@ def audio_to_tensor(path, frame_rate=16_000):
         waveform = resampler(waveform)
     return waveform.squeeze().numpy(), frame_rate
 
+# Count number of labels
+def get_label_count(data_config: pd.DataFrame, label_df: pd.DataFrame) -> torch.Tensor:
+    label_count = torch.zeros(len(label_df), dtype=torch.int64)
+    for _, row in data_config.iterrows():
+        label = row['label']
+        value = label_df.loc[label_df["CEFR Level"] == label, "label"].values
+        if len(value) > 0:
+            label_count[int(value[0])] += 1
+        else:
+            logger.warning(f"Label '{label}' not found in CEFR label mapping for file: {row['path']}")
+    return label_count
+
 # ------------------- Dataset -------------------
 
 class ICNALE_SM_Dataset(Dataset):
@@ -118,7 +130,11 @@ class SpeechModel(nn.Module):
         hidden_size = self.encoder.config.hidden_size
         self.pooler = MeanPooler()
         self.mlp = nn.Sequential(
-            nn.Linear(hidden_size, 256),
+            nn.Linear(hidden_size, 4096),
+            nn.GELU(),
+            nn.Linear(4096, 1024),
+            nn.GELU(),
+            nn.Linear(1024, 256),
             nn.GELU(),
             nn.LayerNorm(256),
         )
@@ -233,9 +249,10 @@ def main():
     NUM_CLASSES = len(cefr_label)
     K_PROTOTYPES = 3
     BATCH_SIZE = 4
-    EPOCHS = 10
+    EPOCHS = 20
     LR = 5e-5
     WARMUP_FRAC = 0.1
+    LW_ALPHA = 1
 
     # Prepare dataset configuration
     train_data_config = pd.read_csv(args.train_data)
@@ -274,12 +291,19 @@ def main():
         drop_last=False,
     )
 
+    # Loss Re-Weghting
+    label_count = get_label_count(train_data_config, cefr_label).float()
+    label_count_pow = label_count.pow()
+    lw_weights = label_count_pow / label_count_pow.sum()
+    lw_weights = lw_weights / label_count
+    lw_weights = lw_weights.to(local_rank)
+
     # Initialize model, criterion, optimiser, scaler, and scheduler
     device = local_rank
     model = SpeechModel(num_classes=NUM_CLASSES, k=K_PROTOTYPES).to(device)
     model = DDP(model, device_ids=[local_rank])
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=lw_weights)
     optimiser = torch.optim.AdamW(model.parameters(), lr=LR)
     scaler = torch.cuda.amp.GradScaler()
 
