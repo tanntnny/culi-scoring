@@ -218,6 +218,11 @@ def main():
     parser = argparse.ArgumentParser(description="Train a baseline model on ICNALE-SM dataset (SLURM DDP).")
     parser.add_argument("--train-data", type=str, required=True, help="Path to the ICNALE-SM training dataset configuration.")
     parser.add_argument("--val-data", type=str, required=True, help="Path to the ICNALE-SM validation dataset configuration.")
+    parser.add_argument("--batch-size", type=int, default=4, help="Batch size for training and validation.")
+    parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs.")
+    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate for the optimizer.")
+    parser.add_argument("--warmup-frac", type=float, default=0.1, help="Fraction of total steps for learning rate warmup.")
+    parser.add_argument("--lw-alpha", type=float, default=1, help="Loss re-weighting alpha parameter.")
     args = parser.parse_args()
 
     # Initialize DDP using SLURM-style env vars
@@ -248,11 +253,11 @@ def main():
     # Define Hyperparameters
     NUM_CLASSES = len(cefr_label)
     K_PROTOTYPES = 3
-    BATCH_SIZE = 4
-    EPOCHS = 20
-    LR = 5e-5
-    WARMUP_FRAC = 0.1
-    LW_ALPHA = 1
+    BATCH_SIZE = args.batch_size
+    EPOCHS = args.epochs
+    LR = args.lr
+    WARMUP_FRAC = args.warmup_frac
+    LW_ALPHA = args.lw_alpha
 
     # Prepare dataset configuration
     train_data_config = pd.read_csv(args.train_data)
@@ -302,6 +307,18 @@ def main():
     device = local_rank
     model = SpeechModel(num_classes=NUM_CLASSES, k=K_PROTOTYPES).to(device)
     model = DDP(model, device_ids=[local_rank])
+
+    # Log model architecture and parameter count
+    if is_main:
+        logger.info(f"Model architecture:\n{model.module}")
+        num_params = sum(p.numel() for p in model.module.parameters())
+        num_trainable = sum(p.numel() for p in model.module.parameters() if p.requires_grad)
+        logger.info(f"Total parameters: {num_params:,} | Trainable: {num_trainable:,}")
+        logger.info(f"Train samples: {len(train_data_config)} | Validation samples: {len(val_data_config)}")
+        logger.info(f"Unique train labels: {train_data_config['label'].nunique()} | Unique val labels: {val_data_config['label'].nunique()}")
+        logger.info(f"Train label distribution:\n{train_data_config['label'].value_counts().to_string()}\n")
+        logger.info(f"Val label distribution:\n{val_data_config['label'].value_counts().to_string()}\n")
+
 
     criterion = nn.CrossEntropyLoss(weight=lw_weights)
     optimiser = torch.optim.AdamW(model.parameters(), lr=LR)
