@@ -51,6 +51,20 @@ def get_label_count(data_config: pd.DataFrame, label_df: pd.DataFrame) -> torch.
             logger.warning(f"Label '{label}' not found in CEFR label mapping for file: {row['path']}")
     return label_count
 
+def get_next_run_dir(base_dir="runs"):
+    os.makedirs(base_dir, exist_ok=True)
+    existing = [d for d in os.listdir(base_dir) if d.startswith("run") and os.path.isdir(os.path.join(base_dir, d))]
+    run_nums = [int(d[3:]) for d in existing if d[3:].isdigit()]
+    next_num = max(run_nums, default=0) + 1
+    run_dir = os.path.join(base_dir, f"run{next_num}")
+    os.makedirs(run_dir, exist_ok=True)
+    return run_dir
+
+def save_model(model, epoch, eval_acc, run_dir):
+    save_path = os.path.join(run_dir, f"model_epoch{epoch}_acc{eval_acc:.4f}.pt")
+    torch.save(model.module.state_dict(), save_path)
+    logger.info(f"Model saved to {save_path}")
+
 # ------------------- Dataset -------------------
 
 class ICNALE_SM_Dataset(Dataset):
@@ -195,19 +209,7 @@ def run_epoch(model, loader, criterion, optimiser=None, scaler=None, device="cud
     return total_loss / max(n, 1), correct / max(n, 1)
 
 
-def get_next_run_dir(base_dir="runs"):
-    os.makedirs(base_dir, exist_ok=True)
-    existing = [d for d in os.listdir(base_dir) if d.startswith("run") and os.path.isdir(os.path.join(base_dir, d))]
-    run_nums = [int(d[3:]) for d in existing if d[3:].isdigit()]
-    next_num = max(run_nums, default=0) + 1
-    run_dir = os.path.join(base_dir, f"run{next_num}")
-    os.makedirs(run_dir, exist_ok=True)
-    return run_dir
 
-def save_model(model, epoch, eval_acc, run_dir):
-    save_path = os.path.join(run_dir, f"model_epoch{epoch}_acc{eval_acc:.4f}.pt")
-    torch.save(model.module.state_dict(), save_path)
-    logger.info(f"Model saved to {save_path}")
 
 # ------------------- Main -------------------
 
@@ -219,7 +221,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size for training and validation.")
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs.")
     parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate for the optimizer.")
-    parser.add_argument("--warmup-frac", type=float, default=0, help="Fraction of total steps for learning rate warmup.")
+    parser.add_argument("--warmup-frac", type=float, default=0.1, help="Fraction of total steps for learning rate warmup.")
     parser.add_argument("--lw-alpha", type=float, default=1, help="Loss re-weighting alpha parameter.")
     args = parser.parse_args()
 
