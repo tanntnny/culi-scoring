@@ -130,9 +130,7 @@ class SpeechModel(nn.Module):
         hidden_size = self.encoder.config.hidden_size
         self.pooler = MeanPooler()
         self.mlp = nn.Sequential(
-            nn.Linear(hidden_size, 4096),
-            nn.GELU(),
-            nn.Linear(4096, 1024),
+            nn.Linear(hidden_size, 1024),
             nn.GELU(),
             nn.Linear(1024, 256),
             nn.GELU(),
@@ -229,7 +227,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size for training and validation.")
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs.")
     parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate for the optimizer.")
-    parser.add_argument("--warmup-frac", type=float, default=0.1, help="Fraction of total steps for learning rate warmup.")
+    parser.add_argument("--warmup-frac", type=float, default=0, help="Fraction of total steps for learning rate warmup.")
     parser.add_argument("--lw-alpha", type=float, default=1, help="Loss re-weighting alpha parameter.")
     args = parser.parse_args()
 
