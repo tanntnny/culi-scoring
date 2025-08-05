@@ -144,7 +144,9 @@ class SpeechModel(nn.Module):
         hidden_size = self.encoder.config.hidden_size
         self.pooler = MeanPooler()
         self.project = nn.Sequential(
-            nn.Linear(hidden_size, 1024),
+            nn.Linear(hidden_size, 4024),
+            nn.GELU(),
+            nn.Linear(4024, 1024),
             nn.GELU(),
             nn.Linear(1024, 256),
             nn.GELU(),
