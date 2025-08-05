@@ -128,10 +128,10 @@ class PrototypicalClassifier(nn.Module):
         self.prototypes = nn.Parameter(
             torch.randn(num_classes * k, embed_dim) / math.sqrt(embed_dim)
         )
-        self.log_tau = nn.Parameter(torch.zeros(()))
+        self.log_tau = nn.Parameter(torch.tensor(-4.0))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        dists = torch.cdist(x, self.prototypes, p=2) ** 2
+        dists = torch.cdist(x, self.prototypes, p=2).pow(2)
         dists = dists.view(x.size(0), self.num_classes, self.k)
         dists = dists.mean(dim=2)
         logits = -dists / torch.exp(self.log_tau)
@@ -146,11 +146,12 @@ class SpeechModel(nn.Module):
         self.metric_head = PrototypicalClassifier(embed_dim=hidden_size, num_classes=num_classes, k=k)
 
     def _get_feature_level_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
-        x = attention_mask.unsqueeze(1).float()  # (B,1,T)
-        for conv in self.encoder.feature_extractor.conv_layers:
-            x = conv(x)
-        mask = (x.abs() > 0).any(dim=1).long()  # (B, T_feat)
-        return mask
+        with torch.no_grad():
+            x = attention_mask.unsqueeze(1).float()  # (B,1,T)
+            for conv in self.encoder.feature_extractor.conv_layers:
+                x = conv(x)
+            mask = (x.abs() > 0).any(dim=1).long()  # (B, T_feat)
+            return mask
 
 
     def forward(self, input_values: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
@@ -218,7 +219,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train a baseline model on ICNALE-SM dataset (SLURM DDP).")
     parser.add_argument("--train-data", type=str, required=True, help="Path to the ICNALE-SM training dataset configuration.")
     parser.add_argument("--val-data", type=str, required=True, help="Path to the ICNALE-SM validation dataset configuration.")
-    parser.add_argument("--batch-size", type=int, default=4, help="Batch size for training and validation.")
+    parser.add_argument("--batch-size", type=int, default=8, help="Batch size for training and validation.")
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs.")
     parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate for the optimizer.")
     parser.add_argument("--warmup-frac", type=float, default=0.1, help="Fraction of total steps for learning rate warmup.")
@@ -296,17 +297,17 @@ def main():
         drop_last=False,
     )
 
-    # Loss Re-Weghting
+    # Initialize model, criterion, optimiser, scaler, and scheduler
+    device = torch.device(f"cuda:{local_rank}")
+    model = SpeechModel(num_classes=NUM_CLASSES, k=K_PROTOTYPES).to(device)
+    model = DDP(model, device_ids=[local_rank])
+
+    # Loss Re-Weighting
     label_count = get_label_count(train_data_config, cefr_label).float()
     label_count_pow = label_count.pow(LW_ALPHA)
     lw_weights = label_count_pow / label_count_pow.sum()
-    lw_weights = lw_weights / label_count
-    lw_weights = lw_weights.to(local_rank)
-
-    # Initialize model, criterion, optimiser, scaler, and scheduler
-    device = local_rank
-    model = SpeechModel(num_classes=NUM_CLASSES, k=K_PROTOTYPES).to(device)
-    model = DDP(model, device_ids=[local_rank])
+    lw_weights = lw_weights / (label_count + 1e-8)
+    lw_weights = lw_weights.to(device)
 
     # Log model architecture and parameter count
     if is_main:
