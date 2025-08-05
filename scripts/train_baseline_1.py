@@ -143,7 +143,14 @@ class SpeechModel(nn.Module):
         self.encoder = Wav2Vec2Model.from_pretrained("models/wav2vec2-model")
         hidden_size = self.encoder.config.hidden_size
         self.pooler = MeanPooler()
-        self.metric_head = PrototypicalClassifier(embed_dim=hidden_size, num_classes=num_classes, k=k)
+        self.project = nn.Sequential(
+            nn.Linear(hidden_size, 1024),
+            nn.GELU(),
+            nn.Linear(1024, 256),
+            nn.GELU(),
+            nn.LayerNorm(256)
+        )
+        self.metric_head = PrototypicalClassifier(embed_dim=256, num_classes=num_classes, k=k)
 
     def _get_feature_level_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
         with torch.no_grad():
@@ -159,7 +166,8 @@ class SpeechModel(nn.Module):
         hidden = out.last_hidden_state  # (B, T_feat, H)
         feat_mask = self._get_feature_level_mask(attention_mask)  # (B, T_feat)
         pooled = self.pooler(hidden, feat_mask)
-        logits = self.metric_head(pooled)
+        z = self.project(pooled)  # (B, 256)
+        logits = self.metric_head(z)
         return logits
 
 # ------------------- Distributed Training Setup (SLURM-style) -------------------
