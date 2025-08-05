@@ -128,7 +128,7 @@ class PrototypicalClassifier(nn.Module):
         self.prototypes = nn.Parameter(
             torch.randn(num_classes * k, embed_dim) / math.sqrt(embed_dim)
         )
-        self.log_tau = nn.Parameter(torch.tensor(-4.0))
+        self.log_tau = nn.Parameter(torch.zeros(()))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         dists = torch.cdist(x, self.prototypes, p=2).pow(2)
