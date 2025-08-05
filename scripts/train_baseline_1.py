@@ -138,7 +138,7 @@ class PrototypicalClassifier(nn.Module):
         return logits
 
 class SpeechModel(nn.Module):
-    def __init__(self, num_classes: int, k: int = 3):
+    def __init__(self, num_classes: int, k: int = 3, embed_dim: int = 768):
         super().__init__()
         self.encoder = Wav2Vec2Model.from_pretrained("models/wav2vec2-model")
         hidden_size = self.encoder.config.hidden_size
@@ -148,11 +148,11 @@ class SpeechModel(nn.Module):
             nn.GELU(),
             nn.Linear(4024, 1024),
             nn.GELU(),
-            nn.Linear(1024, 256),
+            nn.Linear(1024, embed_dim),
             nn.GELU(),
-            nn.LayerNorm(256)
+            nn.LayerNorm(embed_dim)
         )
-        self.metric_head = PrototypicalClassifier(embed_dim=256, num_classes=num_classes, k=k)
+        self.metric_head = PrototypicalClassifier(embed_dim=embed_dim, num_classes=num_classes, k=k)
 
     def _get_feature_level_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
         with torch.no_grad():
