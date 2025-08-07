@@ -17,9 +17,11 @@ module load FFmpeg/6.0.1-cpeCray-23.03
 module load Mamba/23.11.0-0
 conda activate pytorch-2.2.2
 
+export PYTHONPATH=$PWD
+
 DATA_CONFIG=datasets/SM/ICNALE_SM_Audio/val_config.csv
 MODEL_PATH=assets/weights_baseline_1.pt
-SAVE_PATH=runs/confusion_matrix.png
+SAVE_PATH=runs/predictions.json
 
 python scripts/eval_baseline_1.py \
     --data_config "$DATA_CONFIG" \

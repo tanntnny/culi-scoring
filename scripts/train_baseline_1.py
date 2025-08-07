@@ -54,10 +54,6 @@ def save_model(model, epoch, eval_acc, run_dir):
     torch.save(model.module.state_dict(), save_path)
     logger.info(f"Model saved to {save_path}")
 
-# ------------------- Dataset -------------------
-
-
-
 # ------------------- Distributed Training Setup (SLURM-style) -------------------
 
 def setup_ddp_from_slurm():

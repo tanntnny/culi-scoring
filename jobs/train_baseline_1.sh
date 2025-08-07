@@ -33,7 +33,7 @@ echo "SLURM_GPUS_ON_NODE=${SLURM_GPUS_ON_NODE}"
 
 export NCCL_DEBUG=warn
 export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
-
+export PYTHONPATH=$PWD
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 # ---- Paths / args ----
