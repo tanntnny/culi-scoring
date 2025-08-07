@@ -3,6 +3,7 @@ import logging
 import math
 import os
 from socket import gethostname
+import sys
 
 import numpy as np
 import pandas as pd
@@ -23,7 +24,7 @@ from transformers import (
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-logger.addHandler(logging.StreamHandler())  # Console handler; per-rank file handler is added in main()
+logger.addHandler(logging.StreamHandler(sys.stdout))  # Console handler; per-rank file handler is added in main()
 
 # These globals are populated in main() after rank is known
 wav2vec_processor = None
@@ -138,7 +139,7 @@ class PrototypicalClassifier(nn.Module):
         return logits
 
 class SpeechModel(nn.Module):
-    def __init__(self, num_classes: int, k: int = 3, embed_dim: int = 256):
+    def __init__(self, num_classes: int, k: int = 3, embed_dim: int = 768):
         super().__init__()
         self.encoder = Wav2Vec2Model.from_pretrained("models/wav2vec2-model")
         hidden_size = self.encoder.config.hidden_size
@@ -240,14 +241,6 @@ def main():
     world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
     is_main = rank == 0
 
-    # Rank-aware logging (separate file per rank)
-    log_dir = "logs"
-    os.makedirs(log_dir, exist_ok=True)
-    fh = logging.FileHandler(os.path.join(log_dir, f"train_baseline_rank{rank}.log"))
-    fh.setLevel(logging.INFO)
-    fh.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
-    logger.addHandler(fh)
-
     if is_main:
         logger.info("Loading Wav2Vec2 processor and CEFR labels.")
     global wav2vec_processor, cefr_label
@@ -342,8 +335,8 @@ def main():
     )
 
     # Prepare run directory
-    run_dir = get_next_run_dir()
     if is_main:
+        run_dir = get_next_run_dir()
         logger.info(f"Saving all results to {run_dir}")
 
     # Train and evaluate
