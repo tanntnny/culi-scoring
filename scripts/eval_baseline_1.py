@@ -48,9 +48,10 @@ def main():
             y_true.extend(labels.cpu().numpy())
 
     output = {
-        "y_true": y_true,
-        "y_pred": y_pred
+        "y_true": [int(x) for x in y_true],
+        "y_pred": [int(x) for x in y_pred]
     }
+    os.makedirs(os.path.dirname(args.save_path), exist_ok=True)
     with open(args.save_path, 'w') as f:
         json.dump(output, f)
     print(f"Predictions and true labels saved to {args.save_path}")
