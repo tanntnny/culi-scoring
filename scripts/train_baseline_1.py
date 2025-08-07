@@ -1,44 +1,27 @@
 import argparse
-import logging
-import math
 import os
 from socket import gethostname
-import sys
 
-import numpy as np
 import pandas as pd
 import torch
-import torchaudio
 from sklearn.model_selection import train_test_split
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 import torch.distributed as dist
 from transformers import (
-    Wav2Vec2Model,
-    Wav2Vec2Processor,
     get_cosine_schedule_with_warmup
 )
 from scripts.utils.models import SpeechModel
 from scripts.utils.icnale_sm_audio_dataset import ICNALE_SM_Dataset, collate_fn
+from scripts.utils.pytorch_utils import (
+    get_label_count,
+    run_epoch,
+    save_model,
+    setup_ddp_from_slurm
+)
 
 # ------------------- Utilities -------------------
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.addHandler(logging.StreamHandler(sys.stdout))  # Console handler; per-rank file handler is added in main()
-
-# Count number of labels
-def get_label_count(data_config: pd.DataFrame, label_df: pd.DataFrame) -> torch.Tensor:
-    label_count = torch.zeros(len(label_df), dtype=torch.int64)
-    for _, row in data_config.iterrows():
-        label = row['label']
-        value = label_df.loc[label_df["CEFR Level"] == label, "label"].values
-        if len(value) > 0:
-            label_count[int(value[0])] += 1
-        else:
-            logger.warning(f"Label '{label}' not found in CEFR label mapping for file: {row['path']}")
-    return label_count
 
 def get_next_run_dir(base_dir="runs"):
     os.makedirs(base_dir, exist_ok=True)
@@ -48,61 +31,6 @@ def get_next_run_dir(base_dir="runs"):
     run_dir = os.path.join(base_dir, f"run{next_num}")
     os.makedirs(run_dir, exist_ok=True)
     return run_dir
-
-def save_model(model, epoch, eval_acc, run_dir):
-    save_path = os.path.join(run_dir, f"model_epoch{epoch}_acc{eval_acc:.4f}.pt")
-    torch.save(model.module.state_dict(), save_path)
-    logger.info(f"Model saved to {save_path}")
-
-# ------------------- Distributed Training Setup (SLURM-style) -------------------
-
-def setup_ddp_from_slurm():
-    world_size = int(os.environ["WORLD_SIZE"])
-    rank = int(os.environ["SLURM_PROCID"])
-    gpus_per_node = int(os.environ["SLURM_GPUS_ON_NODE"])
-
-    assert gpus_per_node == torch.cuda.device_count(), (
-        f"SLURM says {gpus_per_node} GPUs, but torch sees {torch.cuda.device_count()}"
-    )
-
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    if rank == 0:
-        logger.info(f"Group initialized? {dist.is_initialized()}")
-
-    local_rank = rank - gpus_per_node * (rank // gpus_per_node)
-    torch.cuda.set_device(local_rank)
-
-    return world_size, rank, local_rank, gpus_per_node
-
-# ------------------- Training Loop -------------------
-
-def run_epoch(model, loader, criterion, optimiser=None, scaler=None, device="cuda"):
-    is_train = optimiser is not None
-    model.train() if is_train else model.eval()
-
-    total_loss, correct, n = 0.0, 0, 0
-    for batch_idx, batch in enumerate(loader):
-        batch = {k: v.to(device, non_blocking=True) for k, v in batch.items()}
-        with torch.cuda.amp.autocast(enabled=scaler is not None):
-            logits = model(batch["input_values"], batch["attention_mask"])
-            loss = criterion(logits, batch["labels"])
-        if is_train:
-            optimiser.zero_grad(set_to_none=True)
-            if scaler:
-                scaler.scale(loss).backward()
-                scaler.step(optimiser)
-                scaler.update()
-            else:
-                loss.backward()
-                optimiser.step()
-        preds = logits.argmax(1)
-        total_loss += loss.item() * preds.size(0)
-        correct += (preds == batch["labels"]).sum().item()
-        n += preds.size(0)
-    return total_loss / max(n, 1), correct / max(n, 1)
-
-
-
 
 # ------------------- Main -------------------
 
@@ -123,13 +51,13 @@ def main():
     is_main = rank == 0
 
     if is_main:
-        logger.info("Loading Wav2Vec2 processor and CEFR labels.")
+        print("Loading Wav2Vec2 processor and CEFR labels.")
     global cefr_label
     try:
         cefr_label = pd.read_csv("assets/cefr_label.csv")
     except FileNotFoundError:
         if is_main:
-            logger.error("File 'assets/cefr_label.csv' not found. Please ensure the file exists and is accessible.")
+            print("File 'assets/cefr_label.csv' not found. Please ensure the file exists and is accessible.")
         # Ensure all ranks exit coherently
         dist.destroy_process_group()
         exit(1)
@@ -194,14 +122,14 @@ def main():
 
     # Log model architecture and parameter count
     if is_main:
-        logger.info(f"Model architecture:\n{model.module}")
+        print(f"Model architecture:\n{model.module}")
         num_params = sum(p.numel() for p in model.module.parameters())
         num_trainable = sum(p.numel() for p in model.module.parameters() if p.requires_grad)
-        logger.info(f"Total parameters: {num_params:,} | Trainable: {num_trainable:,}")
-        logger.info(f"Train samples: {len(train_data_config)} | Validation samples: {len(val_data_config)}")
-        logger.info(f"Unique train labels: {train_data_config['label'].nunique()} | Unique val labels: {val_data_config['label'].nunique()}")
-        logger.info(f"Train label distribution:\n{train_data_config['label'].value_counts().to_string()}\n")
-        logger.info(f"Val label distribution:\n{val_data_config['label'].value_counts().to_string()}\n")
+        print(f"Total parameters: {num_params:,} | Trainable: {num_trainable:,}")
+        print(f"Train samples: {len(train_data_config)} | Validation samples: {len(val_data_config)}")
+        print(f"Unique train labels: {train_data_config['label'].nunique()} | Unique val labels: {val_data_config['label'].nunique()}")
+        print(f"Train label distribution:\n{train_data_config['label'].value_counts().to_string()}\n")
+        print(f"Val label distribution:\n{val_data_config['label'].value_counts().to_string()}\n")
 
 
     criterion = nn.CrossEntropyLoss(weight=lw_weights)
@@ -217,14 +145,14 @@ def main():
     # Prepare run directory
     if is_main:
         run_dir = get_next_run_dir()
-        logger.info(f"Saving all results to {run_dir}")
+        print(f"Saving all results to {run_dir}")
 
     # Train and evaluate
     best_val_acc = 0.0
     metrics = []
     for epoch in range(EPOCHS):
         if is_main:
-            logger.info(f"Epoch {epoch+1}/{EPOCHS} started.")
+            print(f"Epoch {epoch+1}/{EPOCHS} started.")
 
         train_sampler.set_epoch(epoch)
         val_sampler.set_epoch(epoch)
@@ -244,7 +172,7 @@ def main():
         val_loss, val_acc = tensor_metrics.tolist()
 
         if is_main:
-            logger.info(
+            print(
                 f"Epoch {epoch+1}: Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f}, "
                 f"Val Loss={val_loss:.4f}, Val Acc={val_acc:.4f}"
             )
@@ -260,7 +188,7 @@ def main():
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
                 save_model(model, epoch+1, val_acc, run_dir)
-                logger.info("New best model saved.")
+                print("New best model saved.")
 
             print(
                 f"Epoch {epoch+1}/{EPOCHS} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} "
@@ -272,7 +200,7 @@ def main():
         metrics_path = os.path.join(run_dir, "metrics.json")
         with open(metrics_path, "w") as f:
             json.dump(metrics, f, indent=2)
-        logger.info(f"Metrics saved to {metrics_path}")
+        print(f"Metrics saved to {metrics_path}")
 
     dist.destroy_process_group()
 
