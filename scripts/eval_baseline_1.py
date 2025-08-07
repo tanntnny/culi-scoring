@@ -3,8 +3,6 @@ import os
 import torch
 import pandas as pd
 import numpy as np
-from sklearn.metrics import confusion_matrix
-import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from transformers import Wav2Vec2Processor
 import json
