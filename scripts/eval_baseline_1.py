@@ -13,9 +13,9 @@ from scripts.utils.models import SpeechModel
 def main():
     parser = argparse.ArgumentParser(description="Evaluate model and export predictions.")
     parser.add_argument("--val-data", type=str, required=True, help="Path to the ICNALE-SM validation dataset configuration.")
-    parser.add_argument('--model_path', type=str, required=True, help='Path to model checkpoint')
-    parser.add_argument('--save_path', type=str, required=True, help='Path to save predictions JSON')
-    parser.add_argument('--cefr_label', type=str, default='assets/cefr_label.csv', help='Path to CEFR label CSV')
+    parser.add_argument('--model-path', type=str, required=True, help='Path to model checkpoint')
+    parser.add_argument('--save-path', type=str, required=True, help='Path to save predictions JSON')
+    parser.add_argument('--cefr-label', type=str, default='assets/cefr_label.csv', help='Path to CEFR label CSV')
     args = parser.parse_args()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

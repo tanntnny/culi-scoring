@@ -19,11 +19,11 @@ conda activate pytorch-2.2.2
 
 export PYTHONPATH=$PWD
 
-VAL_CONFIG=datasets/SM/ICNALE_SM_Audio/val_config.csv
+VAL_DATA=datasets/SM/ICNALE_SM_Audio/val_config.csv
 MODEL_PATH=assets/weights_baseline_1.pt
 SAVE_PATH=runs/predictions.json
 
 python scripts/eval_baseline_1.py \
-    --val_config "$VAL_CONFIG" \
-    --model_path "$MODEL_PATH" \
-    --save_path "$SAVE_PATH"
+    --val-data "$VAL_DATA" \
+    --model-path "$MODEL_PATH" \
+    --save-path "$SAVE_PATH"
