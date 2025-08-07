@@ -19,27 +19,14 @@ from transformers import (
     Wav2Vec2Processor,
     get_cosine_schedule_with_warmup
 )
-from models.models import SpeechModel
+from scripts.utils.models import SpeechModel
+from scripts.utils.icnale_sm_audio_dataset import ICNALE_SM_Dataset, collate_fn
 
 # ------------------- Utilities -------------------
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler(sys.stdout))  # Console handler; per-rank file handler is added in main()
-
-# These globals are populated in main() after rank is known
-wav2vec_processor = None
-
-# Convert audio file to tensor
-def audio_to_tensor(path, frame_rate=16_000):
-    logger.debug(f"Loading {path} with torchaudio.")
-    waveform, sample_rate = torchaudio.load(path)
-    if waveform.shape[0] > 1:
-        waveform = torch.mean(waveform, dim=0, keepdim=True)
-    if sample_rate != frame_rate:
-        resampler = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=frame_rate)
-        waveform = resampler(waveform)
-    return waveform.squeeze().numpy(), frame_rate
 
 # Count number of labels
 def get_label_count(data_config: pd.DataFrame, label_df: pd.DataFrame) -> torch.Tensor:
@@ -69,49 +56,7 @@ def save_model(model, epoch, eval_acc, run_dir):
 
 # ------------------- Dataset -------------------
 
-class ICNALE_SM_Dataset(Dataset):
-    def __init__(self, data_config, cefr_label_df):
-        logger.info(f"Initializing dataset with {len(data_config)} samples.")
-        self.cefr_label_df = cefr_label_df
-        self.samples = []
-        for _, row in data_config.iterrows():
-            path, label = row['path'], row['label']
-            value = cefr_label_df.loc[cefr_label_df["CEFR Level"] == label, "label"].values
-            if len(value) > 0:
-                self.samples.append((path, int(value[0])))
-            else:
-                logger.warning(f"Label '{label}' not found in CEFR label mapping for file: {path}")
 
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        path, label = self.samples[idx]
-        try:
-            waveform, _ = audio_to_tensor(path)
-        except Exception as e:
-            logger.warning(f"Error loading audio {path}: {e}")
-            waveform = np.zeros(16000)
-        return waveform, label
-
-
-def collate_fn(batch):
-    waveforms, labels = zip(*batch)
-    proc_out = wav2vec_processor(
-        waveforms,
-        sampling_rate=16_000,
-        return_tensors="pt",
-        padding=True,
-        return_attention_mask=True,
-    )
-
-    if "attention_mask" not in proc_out:
-        input_values = proc_out["input_values"]  # shape: (batch, seq)
-        proc_out["attention_mask"] = torch.ones(
-            input_values.shape, dtype=torch.long
-        )
-    proc_out["labels"] = torch.tensor(labels, dtype=torch.long)
-    return proc_out
 
 # ------------------- Distributed Training Setup (SLURM-style) -------------------
 
@@ -183,8 +128,7 @@ def main():
 
     if is_main:
         logger.info("Loading Wav2Vec2 processor and CEFR labels.")
-    global wav2vec_processor, cefr_label
-    wav2vec_processor = Wav2Vec2Processor.from_pretrained("models/wav2vec2-processor")
+    global cefr_label
     try:
         cefr_label = pd.read_csv("assets/cefr_label.csv")
     except FileNotFoundError:
