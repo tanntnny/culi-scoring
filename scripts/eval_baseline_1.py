@@ -7,30 +7,16 @@ from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from transformers import Wav2Vec2Processor
+import json
 
 from scripts.utils.icnale_sm_audio_dataset import ICNALE_SM_Dataset, collate_fn
 from scripts.utils.models import SpeechModel
 
-def plot_and_save_confusion_matrix(y_true, y_pred, labels, save_path):
-    cm = confusion_matrix(y_true, y_pred, labels=labels)
-    plt.figure(figsize=(8, 6))
-    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
-    plt.title('Confusion Matrix')
-    plt.colorbar()
-    tick_marks = np.arange(len(labels))
-    plt.xticks(tick_marks, labels, rotation=45)
-    plt.yticks(tick_marks, labels)
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.tight_layout()
-    plt.savefig(save_path)
-    plt.close()
-
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate model and save confusion matrix.")
+    parser = argparse.ArgumentParser(description="Evaluate model and export predictions.")
     parser.add_argument("--val-data", type=str, required=True, help="Path to the ICNALE-SM validation dataset configuration.")
     parser.add_argument('--model_path', type=str, required=True, help='Path to model checkpoint')
-    parser.add_argument('--save_path', type=str, required=True, help='Path to save confusion matrix image')
+    parser.add_argument('--save_path', type=str, required=True, help='Path to save predictions JSON')
     parser.add_argument('--cefr_label', type=str, default='assets/cefr_label.csv', help='Path to CEFR label CSV')
     args = parser.parse_args()
 
@@ -63,9 +49,13 @@ def main():
             y_pred.extend(preds)
             y_true.extend(labels.cpu().numpy())
 
-    # Save confusion matrix
-    plot_and_save_confusion_matrix(y_true, y_pred, labels=list(range(num_classes)), save_path=args.save_path)
-    print(f"Confusion matrix saved to {args.save_path}")
+    output = {
+        "y_true": y_true,
+        "y_pred": y_pred
+    }
+    with open(args.save_path, 'w') as f:
+        json.dump(output, f)
+    print(f"Predictions and true labels saved to {args.save_path}")
 
 if __name__ == "__main__":
     main()
