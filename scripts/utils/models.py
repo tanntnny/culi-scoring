@@ -29,7 +29,7 @@ class PrototypicalClassifier(nn.Module):
         return logits
 
 class SpeechModel(nn.Module):
-    def __init__(self, num_classes: int, k: int = 3, embed_dim: int = 768):
+    def __init__(self, num_classes: int, k: int = 3, embed_dim: int = 256):
         super().__init__()
         self.encoder = Wav2Vec2Model.from_pretrained("models/wav2vec2-model")
         hidden_size = self.encoder.config.hidden_size
