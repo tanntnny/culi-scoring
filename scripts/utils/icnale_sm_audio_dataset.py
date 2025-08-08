@@ -31,15 +31,18 @@ class ICNALE_SM_Dataset(Dataset):
 
     def __getitem__(self, idx):
         path, label = self.samples[idx]
-        try:
-            waveform, _ = audio_to_tensor(path)
-        except Exception as e:
-            waveform = np.zeros(16000)
-        return waveform, label
-
+        return path, label
 
 def collate_fn(batch):
-    waveforms, labels = zip(*batch)
+    paths, labels = zip(*batch)
+    waveforms = [np.zeros(16000) for _ in paths]
+    for i, path in enumerate(paths):
+        try:
+            waveforms[i], _ = audio_to_tensor(path)
+        except Exception as e:
+            pass
+    waveforms = torch.tensor(waveforms, dtype=torch.float64)
+
     proc_out = wav2vec_processor(
         waveforms,
         sampling_rate=16_000,
@@ -54,4 +57,5 @@ def collate_fn(batch):
             input_values.shape, dtype=torch.long
         )
     proc_out["labels"] = torch.tensor(labels, dtype=torch.long)
+    proc_out["paths"] = paths
     return proc_out

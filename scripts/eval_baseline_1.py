@@ -36,18 +36,21 @@ def main():
     dataset = ICNALE_SM_Dataset(val_config, cefr_label)
     loader = DataLoader(dataset, batch_size=8, collate_fn=collate_fn)
 
-    y_true, y_pred = [], []
+    x_paths, y_true, y_pred = [], [], []
     with torch.no_grad():
         for batch in loader:
             input_values = batch["input_values"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             labels = batch["labels"].to(device)
+            paths = batch["paths"]
             logits = model(input_values, attention_mask)
             preds = logits.argmax(1).cpu().numpy()
+            x_paths.extend(paths)
             y_pred.extend(preds)
             y_true.extend(labels.cpu().numpy())
 
     output = {
+        "x_paths": [str(x) for x in x_paths],
         "y_true": [int(x) for x in y_true],
         "y_pred": [int(x) for x in y_pred]
     }
