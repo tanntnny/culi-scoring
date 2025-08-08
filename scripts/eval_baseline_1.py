@@ -2,9 +2,7 @@ import argparse
 import os
 import torch
 import pandas as pd
-import numpy as np
 from torch.utils.data import DataLoader
-from transformers import Wav2Vec2Processor
 import json
 
 from scripts.utils.icnale_sm_audio_dataset import ICNALE_SM_Dataset, collate_fn
@@ -37,8 +35,10 @@ def main():
     loader = DataLoader(dataset, batch_size=8, collate_fn=collate_fn)
 
     x_paths, y_true, y_pred = [], [], []
+    total_batches = len(loader)
     with torch.no_grad():
-        for batch in loader:
+        print("Starting evaluation...")
+        for i, batch in enumerate(loader, 1):
             input_values = batch["input_values"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             labels = batch["labels"].to(device)
@@ -48,6 +48,8 @@ def main():
             x_paths.extend(paths)
             y_pred.extend(preds)
             y_true.extend(labels.cpu().numpy())
+            if i % 10 == 0 or i == total_batches:
+                print(f"[Validation] Batch {i}/{total_batches} processed.")
 
     output = {
         "x_paths": [str(x) for x in x_paths],

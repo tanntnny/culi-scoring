@@ -41,7 +41,6 @@ def collate_fn(batch):
             waveforms[i], _ = audio_to_tensor(path)
         except Exception as e:
             pass
-    waveforms = torch.tensor(waveforms, dtype=torch.float64)
 
     proc_out = wav2vec_processor(
         waveforms,
