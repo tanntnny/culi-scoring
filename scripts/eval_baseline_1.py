@@ -52,7 +52,7 @@ def main():
                 print(f"[Validation] Batch {i}/{total_batches} processed.")
 
     output = {
-        "x_paths": [str(x) for x in x_paths],
+        "x_path": [str(x) for x in x_paths],
         "y_true": [int(x) for x in y_true],
         "y_pred": [int(x) for x in y_pred]
     }

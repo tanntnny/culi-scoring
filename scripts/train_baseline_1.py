@@ -1,6 +1,5 @@
 import argparse
 import os
-from socket import gethostname
 
 import pandas as pd
 import torch

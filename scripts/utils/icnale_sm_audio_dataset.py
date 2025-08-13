@@ -4,8 +4,7 @@ import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
 from transformers import Wav2Vec2Processor
-
-wav2vec_processor = Wav2Vec2Processor.from_pretrained("models/wav2vec2-processor")
+from pathlib import Path
 
 def audio_to_tensor(path, frame_rate=16_000):
     waveform, sample_rate = torchaudio.load(path)
@@ -16,7 +15,7 @@ def audio_to_tensor(path, frame_rate=16_000):
         waveform = resampler(waveform)
     return waveform.squeeze().numpy(), frame_rate
 
-class ICNALE_SM_Dataset(Dataset):
+class ICNALESMDataset(Dataset):
     def __init__(self, data_config, cefr_label_df):
         self.cefr_label_df = cefr_label_df
         self.samples = []
@@ -33,28 +32,32 @@ class ICNALE_SM_Dataset(Dataset):
         path, label = self.samples[idx]
         return path, label
 
-def collate_fn(batch):
-    paths, labels = zip(*batch)
-    waveforms = [np.zeros(16000) for _ in paths]
-    for i, path in enumerate(paths):
-        try:
-            waveforms[i], _ = audio_to_tensor(path)
-        except Exception as e:
-            pass
+def create_collate_fn(
+        audio_processor: Path,
+):
+    wav2vec_processor = Wav2Vec2Processor.from_pretrained(audio_processor)
+    def collate_fn(batch):
+        paths, labels = zip(*batch)
+        waveforms = [np.zeros(16000) for _ in paths]
+        for i, path in enumerate(paths):
+            try:
+                waveforms[i], _ = audio_to_tensor(path)
+            except Exception as e:
+                pass
 
-    proc_out = wav2vec_processor(
-        waveforms,
-        sampling_rate=16_000,
-        return_tensors="pt",
-        padding=True,
-        return_attention_mask=True,
-    )
-
-    if "attention_mask" not in proc_out:
-        input_values = proc_out["input_values"]  # shape: (batch, seq)
-        proc_out["attention_mask"] = torch.ones(
-            input_values.shape, dtype=torch.long
+        proc_out = wav2vec_processor(
+            waveforms,
+            sampling_rate=16_000,
+            return_tensors="pt",
+            padding=True,
+            return_attention_mask=True,
         )
-    proc_out["labels"] = torch.tensor(labels, dtype=torch.long)
-    proc_out["paths"] = paths
-    return proc_out
+
+        if "attention_mask" not in proc_out:
+            input_values = proc_out["input_values"]  # shape: (batch, seq)
+            proc_out["attention_mask"] = torch.ones(
+                input_values.shape, dtype=torch.long
+            )
+        proc_out["labels"] = torch.tensor(labels, dtype=torch.long)
+        proc_out["paths"] = paths
+        return proc_out
