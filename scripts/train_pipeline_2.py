@@ -64,7 +64,6 @@ def main():
 
     parser.add_argument("--k-prototypes", type=int, default=3, help="Number of prototypes for the Prototypical Network.")
     parser.add_argument("--lstm-hid", type=int, default=256, help="Hidden size for the LSTM.")
-    parser.add_argument("--lstm-hid", type=int, default=256, help="Hidden size for the LSTM.")
     parser.add_argument("--fusion-proj-dim", type=int, default=256, help="Projection dimension for the fusion layer.")
     parser.add_argument("--pt-metric", type=str, default="sed", help="Metric for the Prototypical Network (e.g., 'sed' or 'cos').")
     args = parser.parse_args()

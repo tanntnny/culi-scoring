@@ -37,9 +37,32 @@ export PYTHONPATH=$PWD
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 # ---- Paths / args ----
+SCRIPT=scripts/train_pipeline_2.py
+
 TRAIN_DATA=datasets/SM/ICNALE_SM_Audio/train_config.csv
 VAL_DATA=datasets/SM/ICNALE_SM_Audio/val_config.csv
-SCRIPT=scripts/train_baseline_1.py
+CEFR_LABEL=datasets/SM/ICNALE_SM_Audio/cefr_labels.csv
+BATCH_SIZE=4
+EPOCHS=50
+LR=5e-5
+WARMUP_FRAC=0.1
+LW_ALPHA=1
+K_PROTOTYPES=3
+LSTM_HID=256
+FUSION_PROJ_DIM=256
+PT_METRIC=sed
 
 echo "Launching with srun..."
-srun python "$SCRIPT" --train-data "$TRAIN_DATA" --val-data "$VAL_DATA"
+srun python "$SCRIPT" \
+    --train-data "$TRAIN_DATA" \
+    --val-data "$VAL_DATA" \
+    --cefr-label "$CEFR_LABEL" \
+    --batch-size "$BATCH_SIZE" \
+    --epochs "$EPOCHS" \
+    --lr "$LR" \
+    --warmup-frac "$WARMUP_FRAC" \
+    --lw-alpha "$LW_ALPHA" \
+    --k-prototypes "$K_PROTOTYPES" \
+    --lstm-hid "$LSTM_HID" \
+    --fusion-proj-dim "$FUSION_PROJ_DIM" \
+    --pt-metric "$PT_METRIC"
