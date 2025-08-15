@@ -70,7 +70,7 @@ def create_dataframe_from_files(
         "label": [],
     }
     
-    checked_files = p
+    checked_files = []
 
     if check_method is not None: checked_files = [f for f in files if check_method(f)]
     else: checked_files = files
