@@ -88,7 +88,7 @@ def create_dataframe_from_files(
             # Fallback
             labels = {label_method(f) for f in files}
             if len(labels) > 1:
-                print(f"Warning: Multiple labels found for group {group_id} ({(os.path.basename(f) for f in files)}): {labels}")
+                print(f"Warning: Multiple labels found for group {group_id} ({(str(os.path.basename(f)) for f in files)}): {labels}")
                 continue
             data["files"].append("\n".join(files))
             data["label"].append(label_method(files[0]))
