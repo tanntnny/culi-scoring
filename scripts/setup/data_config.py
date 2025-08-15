@@ -123,7 +123,7 @@ def main():
 
     walked_files = walk_folder(Path(DATA_PATH), only_files=True)
     walked_files = [f for f in walked_files if f.endswith(tuple(DATA_EXT.split(",")))]
-    data_df = create_dataframe_from_files(walked_files, group_method=group_by_id, label_method=label_from_icnale)
+    data_df = create_dataframe_from_files(walked_files, check_method=check_from_icnale, group_method=group_by_id, label_method=label_from_icnale)
     train_df, val_df = df_split(data_df, TRAIN_RATIO, shuffle=True)
     val_df, test_df = df_split(val_df, 0.5, shuffle=True)
     
