@@ -62,9 +62,12 @@ def create_dataframe_from_files(files: list[str], label_method: callable, group_
     if group_method:
         group = {}
         for f in files:
-            group_id = group_method(f)
-            if group_id not in group: group[group_id] = []
-            group[group_id].append(f)
+            try:
+                group_id = group_method(f)
+                if group_id not in group: group[group_id] = []
+                group[group_id].append(f)
+            except Exception as e:
+                print(f"Error processing file {f}: {e}")
         for group_id, files in group.items():
             # Fallback
             labels = {label_method(f) for f in files}
