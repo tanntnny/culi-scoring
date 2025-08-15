@@ -42,6 +42,11 @@ def df_split(
 
     return set1, set2
 
+def check_from_icnale(file_path: str):
+    basename = os.path.basename(file_path)
+    splits = basename.split("_")
+    return len(splits) == 6
+
 def group_by_id(file_path: str):
     basename = os.path.basename(file_path)
     splits = basename.split("_")
@@ -54,14 +59,25 @@ def label_from_icnale(file_path: str):
     label = splits[-2] + splits[-1][0]
     return label
 
-def create_dataframe_from_files(files: list[str], label_method: callable, group_method: callable = None) -> pd.DataFrame:
+def create_dataframe_from_files(
+        files: list[str],
+        label_method: callable,
+        check_method: callable = None,
+        group_method: callable = None
+        ) -> pd.DataFrame:
     data = {
         "files": [],
         "label": [],
     }
+    
+    checked_files = p
+
+    if check_method is not None: checked_files = [f for f in files if check_method(f)]
+    else: checked_files = files
+
     if group_method:
         group = {}
-        for f in files:
+        for f in checked_files:
             try:
                 group_id = group_method(f)
                 if group_id not in group: group[group_id] = []
@@ -73,10 +89,13 @@ def create_dataframe_from_files(files: list[str], label_method: callable, group_
             labels = {label_method(f) for f in files}
             if len(labels) > 1:
                 print(f"Warning: Multiple labels found for group {group_id}: {labels}")
-                return None
-
+                continue
             data["files"].append("\n".join(files))
             data["label"].append(label_method(files[0]))
+    else:
+        for f in checked_files:
+            data["files"].append(f)
+            data["label"].append(label_method(f))
     return pd.DataFrame(data)
 
 def main():
