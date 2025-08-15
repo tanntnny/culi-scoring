@@ -85,10 +85,11 @@ def create_dataframe_from_files(
             except Exception as e:
                 print(f"Error processing file {f}: {e}")
         for group_id, files in group.items():
+            basenames = [os.path.basename(f) for f in files]
             # Fallback
             labels = {label_method(f) for f in files}
             if len(labels) > 1:
-                print(f"Warning: Multiple labels found for group {group_id} ({(str(os.path.basename(f)) for f in files)}): {labels}")
+                print(f"Warning: Multiple labels found for group {group_id} ({basenames}): {labels}")
                 continue
             data["files"].append("\n".join(files))
             data["label"].append(label_method(files[0]))
