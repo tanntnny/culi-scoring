@@ -62,6 +62,10 @@ def main():
     parser.add_argument("--warmup-frac", type=float, default=0.1, help="Fraction of total steps for learning rate warmup.")
     parser.add_argument("--lw-alpha", type=float, default=1, help="Loss re-weighting alpha parameter.")
 
+    parser.add_argument("--wav2vec2-processor", type=str, default="models/wav2vec2-processor", help="Path to the Wav2Vec2 processor directory.")
+    parser.add_argument("--wav2vec2-encoder", type=str, default="models/wav2vec2-model", help="Path to the Wav2Vec2 encoder/model directory.")
+    parser.add_argument("--bert-tokenizer", type=str, default="models/bert-tokenizer", help="Path to the BERT tokenizer directory.")
+    parser.add_argument("--bert-model", type=str, default="models/bert-model", help="Path to the BERT model directory.")
     parser.add_argument("--k-prototypes", type=int, default=3, help="Number of prototypes for the Prototypical Network.")
     parser.add_argument("--lstm-hid", type=int, default=256, help="Hidden size for the LSTM.")
     parser.add_argument("--fusion-proj-dim", type=int, default=256, help="Projection dimension for the fusion layer.")
@@ -82,6 +86,10 @@ def main():
     LSTM_HID = args.lstm_hid
     FUSION_PROJ_DIM = args.fusion_proj_dim
     PT_METRIC = args.pt_metric
+    WAV2VEC2_PROCESSOR = args.wav2vec2_processor
+    WAV2VEC2_ENCODER = args.wav2vec2_encoder
+    BERT_TOKENIZER = args.bert_tokenizer
+    BERT_MODEL = args.bert_model
 
     # Setup DDP
     world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
@@ -93,7 +101,7 @@ def main():
     cefr_label_df = pd.read_csv(CEFR_LABEL)
     num_classes = len(cefr_label_df)
 
-    collate_fn = create_collate_fn()
+    collate_fn = create_collate_fn(WAV2VEC2_PROCESSOR, BERT_TOKENIZER)
     train_dataset = MultimodalSMDataset(TRAIN_DATA, CEFR_LABEL)
     val_dataset = MultimodalSMDataset(VAL_DATA, CEFR_LABEL)
     train_sampler = DistributedSampler(train_dataset, shuffle=True, num_replicas=world_size, rank=rank)
@@ -119,6 +127,8 @@ def main():
 
     # Initialize models, criterion, optimizers, and schedulers
     model = MultimodalModel(
+        wav2vec2_encoder=WAV2VEC2_ENCODER,
+        bert_model=BERT_MODEL,
         num_classes=num_classes,
         k=K_PROTOTYPES,
         lstm_hidden_dim=LSTM_HID,
@@ -147,6 +157,10 @@ def main():
         print(f"LSTM hidden dim: {LSTM_HID}")
         print(f"Fusion projection dim: {FUSION_PROJ_DIM}")
         print(f"PT metric: {PT_METRIC}")
+        print(f"Wav2Vec2 processor: {WAV2VEC2_PROCESSOR}")
+        print(f"Wav2Vec2 encoder: {WAV2VEC2_ENCODER}")
+        print(f"BERT tokenizer: {BERT_TOKENIZER}")
+        print(f"BERT model: {BERT_MODEL}")
         print(f"-------------------------------------------------")
         print(f"Model architecture:\n{model.module}")
         num_params = sum(p.numel() for p in model.module.parameters())

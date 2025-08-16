@@ -89,7 +89,7 @@ def main():
     parser = argparse.ArgumentParser(description="Setup data configuration for ICNALE-SM dataset.")
     parser.add_argument("--data-path", type=str, required=True, help="Path to the ICNALE-SM dataset.")
     parser.add_argument("--output-path", type=str, required=True, help="Path to save the processed dataset.")
-    parser.add_argument("--train-ratio", type=float, default=0.8, help="Train split ratio.")
+    parser.add_argument("--train-ratio", type=float, default=0.9, help="Train split ratio.")
     parser.add_argument("--data-ext", type=str, default=".mp3,.wav,.txt", help="Comma-separated list of file extensions to include.")
     args = parser.parse_args()
 

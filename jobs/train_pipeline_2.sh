@@ -51,6 +51,10 @@ K_PROTOTYPES=3
 LSTM_HID=256
 FUSION_PROJ_DIM=256
 PT_METRIC=sed
+WAV2VEC2_PROCESSOR=models/wav2vec2-processor
+WAV2VEC2_ENCODER=models/wav2vec2-model
+BERT_TOKENIZER=models/bert-tokenizer
+BERT_MODEL=models/bert-model
 
 echo "Launching with srun..."
 srun python "$SCRIPT" \
@@ -65,4 +69,8 @@ srun python "$SCRIPT" \
     --k-prototypes "$K_PROTOTYPES" \
     --lstm-hid "$LSTM_HID" \
     --fusion-proj-dim "$FUSION_PROJ_DIM" \
-    --pt-metric "$PT_METRIC"
+    --pt-metric "$PT_METRIC" \
+    --wav2vec2-processor "$WAV2VEC2_PROCESSOR" \
+    --wav2vec2-encoder "$WAV2VEC2_ENCODER" \
+    --bert-tokenizer "$BERT_TOKENIZER" \
+    --bert-model "$BERT_MODEL"

@@ -49,9 +49,11 @@ class MultimodalSMDataset(Dataset):
         return audio_path, text_path, ids, label
 
 def create_collate_fn(
-        audio_processor: Wav2Vec2Processor,
-        text_tokenizer: BertTokenizer
+        audio_processor: Path,
+        text_tokenizer: Path
 ):
+    audio_processor = Wav2Vec2Processor.from_pretrained(audio_processor)
+    text_tokenizer = BertTokenizer.from_pretrained(text_tokenizer)
     def collate_fn(batch):
         audio_paths, text_paths, ids, labels = zip(*batch)
         waveforms = [np.zeros(16000) for _ in audio_paths]

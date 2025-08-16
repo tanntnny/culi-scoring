@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -81,6 +82,8 @@ class SpeechModel(nn.Module):
 # Multimodal Model
 class MultimodalModel(nn.Module):
     def __init__(self,
+                wav2vec2_encoder: Path,
+                text_encoder: Path,
                 num_classes: int,
                 k: int = 3,
                 lstm_hidden_dim: int = 256,
@@ -88,10 +91,10 @@ class MultimodalModel(nn.Module):
                 pt_metric: str = "sed"
                 ):
         super().__init__()
-        self.audio_encoder = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-base")
+        self.audio_encoder = Wav2Vec2Model.from_pretrained(wav2vec2_encoder)
         self.audio_encoder.gradient_checkpointing_enable()
         self.audio_lstm = nn.LSTM(self.audio_encoder.config.hidden_size, lstm_hidden_dim, batch_first=True, bidirectional=True)
-        self.text_encoder = BertModel.from_pretrained("bert-base-uncased")
+        self.text_encoder = BertModel.from_pretrained(text_encoder)
         self.text_encoder.gradient_checkpointing_enable()
         self.text_lstm = nn.LSTM(self.text_encoder.config.hidden_size, lstm_hidden_dim, batch_first=True, bidirectional=True)
         self.fusion_projection = nn.Sequential(
