@@ -37,23 +37,50 @@ def label_from_icnale(file_path: str):
     label = splits[-2] + splits[-1][0]
     return label
 
+def id_from_icnale(file_path: str):
+    basename = os.path.basename(file_path)
+    basename = basename.replace(".mp3", "").replace(".wav", "").replace(".txt", "")
+    return basename
+
 def create_dataframe_from_files(
         files: list[str],
         label_method: callable,
         group_method: callable = None
         ) -> pd.DataFrame:
     data = {
-        "files": [],
+        "ids": [],
+        "audio_path": [],
+        "text_path": [],
         "label": [],
     }
+    
+    data_dict = {}
 
     for f in files:
-        data["files"].append(f)
-        data["label"].append(label_method(f))
+        id = id_from_icnale(f)
+        if id not in data_dict:
+            data_dict[id] = {
+                "audio_path": None,
+                "text_path": None,
+                "label": label_from_icnale(f)
+            }
+        name, ext = os.path.splitext(f)
+        if ext in [".mp3", ".wav"]:
+            data_dict[id]["audio_path"] = f
+        elif ext == ".txt":
+            data_dict[id]["text_path"] = f
+
+    for id, value in data_dict.items():
+        if value["audio_path"] is None or value["text_path"] is None:
+            continue
+        data["ids"].append(id)
+        data["audio_path"].append(value["audio_path"])
+        data["text_path"].append(value["text_path"])
+        data["label"].append(value["label"])
 
     df = pd.DataFrame(data)
 
-    if group_method is not None: df["groups"] = df["files"].apply(group_method)
+    if group_method is not None: df["groups"] = df["ids"].apply(group_method)
 
     return df
 
@@ -92,8 +119,9 @@ def main():
         groups[group_id].append(f)
     walked_files = [f for f in walked_files if len(groups[group_by_id(f)]) == 12]
 
-    # Create dataframe
+    # Create multimodal dataframe
     data_df = create_dataframe_from_files(walked_files, group_method=group_by_id, label_method=label_from_icnale)
+
     folds = StratifiedGroupKFold(
         n_splits=5,
         shuffle=True,
