@@ -84,20 +84,16 @@ def main():
     walked_files = [f for f in walked_files if f.endswith(tuple(DATA_EXT.split(",")))]
     walked_files = [f for f in walked_files if check_from_icnale(f)]
 
-    # Debug
+    # Check if the group has 12 data
     groups = {}
     for f in walked_files:
-        if not check_from_icnale(f):
-            print(f"Skipping file {f} as it does not match ICNALE format.")
-            continue
         group_id = group_by_id(f)
         if group_id not in groups: groups[group_id] = []
         groups[group_id].append(f)
-    for k, v in groups.items():
-        if len(v) != 12: print("ERROR!!!")
-        print(f"Group {k}: {len(v)} files ({[os.path.basename(x) for x in v]})")
+    walked_files = [f for f in walked_files if len(groups[group_by_id(f)]) == 12]
 
-    data_df = create_dataframe_from_files(walked_files, check_method=check_from_icnale, group_method=group_by_id, label_method=label_from_icnale)
+    # Create dataframe
+    data_df = create_dataframe_from_files(walked_files, group_method=group_by_id, label_method=label_from_icnale)
     folds = StratifiedGroupKFold(
         n_splits=5,
         shuffle=True,
