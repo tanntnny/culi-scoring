@@ -88,6 +88,16 @@ def main():
 
     walked_files = walk_folder(Path(DATA_PATH), only_files=True)
     walked_files = [f for f in walked_files if f.endswith(tuple(DATA_EXT.split(",")))]
+
+    # Debug
+    groups = {}
+    for f in walked_files:
+        group_id = group_by_id(f)
+        if group_id not in groups: groups[group_id] = []
+        groups[group_id].append(f)
+    for k, v in groups.items():
+        print(f"Group {k}: {len(v)} files")
+
     data_df = create_dataframe_from_files(walked_files, check_method=check_from_icnale, group_method=group_by_id, label_method=label_from_icnale)
     folds = StratifiedGroupKFold(
         n_splits=5,
