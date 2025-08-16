@@ -23,7 +23,7 @@ def walk_folder(folder_path: Path, only_files: bool = True):
 def check_from_icnale(file_path: str):
     basename = os.path.basename(file_path)
     splits = basename.split("_")
-    return len(splits) == 6
+    return len(splits) == 6 and (splits[-1][1] != "(")
 
 def group_by_id(file_path: str):
     basename = os.path.basename(file_path)
@@ -40,20 +40,14 @@ def label_from_icnale(file_path: str):
 def create_dataframe_from_files(
         files: list[str],
         label_method: callable,
-        check_method: callable = None,
         group_method: callable = None
         ) -> pd.DataFrame:
     data = {
         "files": [],
         "label": [],
     }
-    
-    checked_files = []
 
-    if check_method is not None: checked_files = [f for f in files if check_method(f)]
-    else: checked_files = files
-
-    for f in checked_files:
+    for f in files:
         data["files"].append(f)
         data["label"].append(label_method(f))
 
@@ -88,6 +82,7 @@ def main():
 
     walked_files = walk_folder(Path(DATA_PATH), only_files=True)
     walked_files = [f for f in walked_files if f.endswith(tuple(DATA_EXT.split(",")))]
+    walked_files = [f for f in walked_files if check_from_icnale(f)]
 
     # Debug
     groups = {}
@@ -99,7 +94,7 @@ def main():
         if group_id not in groups: groups[group_id] = []
         groups[group_id].append(f)
     for k, v in groups.items():
-        if len(v) != 12: print("ERRRRORORO")
+        if len(v) != 12: print("ERROR!!!")
         print(f"Group {k}: {len(v)} files ({[os.path.basename(x) for x in v]})")
 
     data_df = create_dataframe_from_files(walked_files, check_method=check_from_icnale, group_method=group_by_id, label_method=label_from_icnale)
