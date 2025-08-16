@@ -1,5 +1,5 @@
 """
-This is the utility module for data configuration and train/val/test splits.
+This is the utility module for data configuration and train/val splits.
 """
 
 import argparse
@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 import pandas as pd
+from sklearn.model_selection import StratifiedGroupKFold
 
 def walk_folder(folder_path: Path, only_files: bool = True):
     walked_files = []
@@ -18,29 +19,6 @@ def walk_folder(folder_path: Path, only_files: bool = True):
             for d in dirs:
                 walked_files.append(os.path.join(root, d))
     return walked_files
-
-def df_split(
-        df: pd.DataFrame,
-        ratio: float,
-        random: int = 42,
-        shuffle: bool = False,
-        ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    set1 = pd.DataFrame()
-    set2 = pd.DataFrame()
-
-    # Shuffle split
-    if shuffle:
-        df = df.sample(frac=1, random_state=random).reset_index(drop=True)
-
-    # Stratified split
-    label_uniques = df["label"].unique()
-    for label in label_uniques:
-        size = len(df[df["label"] == label])
-        set1_size = int(size * ratio)
-        set1 = pd.concat([set1, df[df["label"] == label][:set1_size]])
-        set2 = pd.concat([set2, df[df["label"] == label][set1_size:]])
-
-    return set1, set2
 
 def check_from_icnale(file_path: str):
     basename = os.path.basename(file_path)
@@ -75,29 +53,15 @@ def create_dataframe_from_files(
     if check_method is not None: checked_files = [f for f in files if check_method(f)]
     else: checked_files = files
 
-    if group_method:
-        group = {}
-        for f in checked_files:
-            try:
-                group_id = group_method(f)
-                if group_id not in group: group[group_id] = []
-                group[group_id].append(f)
-            except Exception as e:
-                print(f"Error processing file {f}: {e}")
-        for group_id, files in group.items():
-            basenames = [os.path.basename(f) for f in files]
-            # Fallback
-            labels = {label_method(f) for f in files}
-            if len(labels) > 1:
-                print(f"Warning: Multiple labels found for group {group_id} ({basenames}): {labels}")
-                continue
-            data["files"].append("\n".join(files))
-            data["label"].append(label_method(files[0]))
-    else:
-        for f in checked_files:
-            data["files"].append(f)
-            data["label"].append(label_method(f))
-    return pd.DataFrame(data)
+    for f in checked_files:
+        data["files"].append(f)
+        data["label"].append(label_method(f))
+
+    df = pd.DataFrame(data)
+
+    if group_method is not None: df["groups"] = df["files"].apply(group_method)
+
+    return df
 
 def main():
     # Parse command line arguments
@@ -125,13 +89,27 @@ def main():
     walked_files = walk_folder(Path(DATA_PATH), only_files=True)
     walked_files = [f for f in walked_files if f.endswith(tuple(DATA_EXT.split(",")))]
     data_df = create_dataframe_from_files(walked_files, check_method=check_from_icnale, group_method=group_by_id, label_method=label_from_icnale)
-    train_df, val_df = df_split(data_df, TRAIN_RATIO, shuffle=True)
-    val_df, test_df = df_split(val_df, 0.5, shuffle=True)
-    
-    os.mkdir(Path(OUTPUT_PATH), exist_ok=True)
-    train_df.to_csv(Path(OUTPUT_PATH) / "train.csv", index=False)
-    val_df.to_csv(Path(OUTPUT_PATH) / "val.csv", index=False)
-    test_df.to_csv(Path(OUTPUT_PATH) / "test.csv", index=False)
+    folds = StratifiedGroupKFold(
+        data_df,
+        group_col="groups",
+        label_col="label",
+        n_splits=5,
+        random_state=42
+    )
+
+    iters = folds.split(
+        data_df["files"],
+        data_df["label"],
+        groups=data_df["groups"]
+    )
+
+    for i, (train_idx, val_idx) in enumerate(iters):
+        train_df = data_df.iloc[train_idx]
+        val_df = data_df.iloc[val_idx]
+        train_df.to_csv(Path(OUTPUT_PATH) / f"train_fold_{i}.csv", index=False)
+        val_df.to_csv(Path(OUTPUT_PATH) / f"val_fold_{i}.csv", index=False)
+        print(f"Fold {i}: train={len(train_df)}, val={len(val_df)}")
+
     print(f"Data split completed. Files saved to {OUTPUT_PATH}")
 
 if __name__ == "__main__":
