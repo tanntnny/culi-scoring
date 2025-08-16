@@ -39,9 +39,9 @@ export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 # ---- Paths / args ----
 SCRIPT=scripts/train_pipeline_2.py
 
-TRAIN_DATA=datasets/SM/ICNALE_SM_Audio/train_config.csv
-VAL_DATA=datasets/SM/ICNALE_SM_Audio/val_config.csv
-CEFR_LABEL=datasets/SM/ICNALE_SM_Audio/cefr_labels.csv
+TRAIN_DATA=assets/train_fold_0.csv
+VAL_DATA=assets/val_fold_0.csv
+CEFR_LABEL=assets/cefr_label.csv
 BATCH_SIZE=4
 EPOCHS=50
 LR=5e-5
