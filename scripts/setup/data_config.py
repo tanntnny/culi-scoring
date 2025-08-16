@@ -90,8 +90,8 @@ def main():
     walked_files = [f for f in walked_files if f.endswith(tuple(DATA_EXT.split(",")))]
     data_df = create_dataframe_from_files(walked_files, check_method=check_from_icnale, group_method=group_by_id, label_method=label_from_icnale)
     folds = StratifiedGroupKFold(
-        data_df,
         n_splits=5,
+        shuffle=True,
         random_state=42
     )
 
