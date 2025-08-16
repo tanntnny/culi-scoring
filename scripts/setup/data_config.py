@@ -92,6 +92,9 @@ def main():
     # Debug
     groups = {}
     for f in walked_files:
+        if not check_from_icnale(f):
+            print(f"Skipping file {f} as it does not match ICNALE format.")
+            continue
         group_id = group_by_id(f)
         if group_id not in groups: groups[group_id] = []
         groups[group_id].append(f)
