@@ -129,7 +129,7 @@ def main():
     )
 
     iters = folds.split(
-        data_df["id"],
+        data_df["ids"],
         data_df["label"],
         groups=data_df["groups"]
     )
