@@ -100,7 +100,7 @@ def main():
         groups[group_id].append(f)
     for k, v in groups.items():
         if len(v) != 12: print("ERRRRORORO")
-        print(f"Group {k}: {len(v)} files ({v})")
+        print(f"Group {k}: {len(v)} files ({[os.path.basename(x) for x in v]})")
 
     data_df = create_dataframe_from_files(walked_files, check_method=check_from_icnale, group_method=group_by_id, label_method=label_from_icnale)
     folds = StratifiedGroupKFold(
