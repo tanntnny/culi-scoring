@@ -91,8 +91,6 @@ def main():
     data_df = create_dataframe_from_files(walked_files, check_method=check_from_icnale, group_method=group_by_id, label_method=label_from_icnale)
     folds = StratifiedGroupKFold(
         data_df,
-        group_col="groups",
-        label_col="label",
         n_splits=5,
         random_state=42
     )
