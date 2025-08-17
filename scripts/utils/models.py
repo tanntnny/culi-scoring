@@ -122,14 +122,13 @@ class MultimodalModel(nn.Module):
                 mask[i, :l] = 1
             return mask
 
-    def forward(self, audio_input_values: torch.Tensor, audio_attention_mask: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor):
-        batch_size = audio_input_values.size(0)
-        device = audio_input_values.device
-        audio_outputs = self.audio_encoder(input_values=audio_input_values, attention_mask=audio_attention_mask)
+    def forward(self, audio_embeddings, text_embeddings, ids, labels):
+        batch_size = audio_embeddings.size(0)
+        device = audio_embeddings.device
+
+        audio_outputs = self.audio_encoder(input_values=audio_embeddings["input_values"], attention_mask=audio_embeddings["attention_mask"])
         audio_hidden_states = audio_outputs.last_hidden_state
-        feature_level_mask = self._get_feature_level_mask(audio_attention_mask)
-        assert audio_hidden_states.shape[1] == feature_level_mask.shape[1], \
-            f"Mismatch! Features:{audio_hidden_states.shape[1]} vs Mask:{feature_level_mask.shape[1]}"
+        feature_level_mask = self._get_feature_level_mask(audio_embeddings["attention_mask"])
         audio_feature_lengths = torch.tensor(
             [audio_hidden_states.shape[1]] * len(audio_hidden_states),
             device=device
@@ -141,7 +140,7 @@ class MultimodalModel(nn.Module):
             valid_audio_hidden = audio_hidden_states[valid_audio_indices]
             valid_audio_lengths = audio_feature_lengths[valid_audio_indices]
             valid_feature_mask = feature_level_mask[valid_audio_indices]
-            audio_packed_sequences = torch.nn.utils.rnn.pack_padded_sequence(
+            audio_packed_sequences = nn.utils.rnn.pack_padded_sequence(
                 valid_audio_hidden,
                 valid_audio_lengths.cpu(),
                 batch_first=True,
@@ -157,16 +156,17 @@ class MultimodalModel(nn.Module):
         else:
             print("\n[Warning] No valid audio sequences in this batch!")
         audio_features = self.audio_projection(audio_pooled)
-        text_outputs = self.text_encoder(input_ids=input_ids, attention_mask=attention_mask)
+        
+        text_outputs = self.text_encoder(input_ids=text_embeddings["input_ids"], attention_mask=text_embeddings["attention_mask"])
         text_hidden_states = text_outputs.last_hidden_state
-        text_lengths = attention_mask.sum(dim=1)
+        text_lengths = text_embeddings["attention_mask"].sum(dim=1)
         text_lstm_out = torch.zeros(batch_size, text_hidden_states.size(1), self.text_lstm.hidden_size * 2, device=device)
         text_pooled = torch.zeros(batch_size, self.text_lstm.hidden_size * 2, device=device)
         valid_text_indices = text_lengths > 0
         if valid_text_indices.any():
             valid_text_hidden = text_hidden_states[valid_text_indices]
             valid_text_lengths = text_lengths[valid_text_indices]
-            valid_text_mask = attention_mask[valid_text_indices]
+            valid_text_mask = text_embeddings["attention_mask"][valid_text_indices]
             text_packed_sequences = torch.nn.utils.rnn.pack_padded_sequence(
                 valid_text_hidden,
                 valid_text_lengths.cpu(),
@@ -185,61 +185,3 @@ class MultimodalModel(nn.Module):
         fused_features = self.fusion_projection(combined_features)
         logits = self.metric_head(fused_features)
         return logits, fused_features
-
-    def init_prototypes(self, dataloader, num_classes, num_prototypes, max_batches: int = None):
-        device = next(self.parameters()).device
-        class_features = [[] for _ in range(num_classes)]
-        self.eval()
-        with torch.no_grad():
-            for i, batch in enumerate(tqdm(dataloader, desc="Initializing Prototypes")):
-                if max_batches is not None and i >= max_batches:
-                    print(f"\nReached max_batches limit ({max_batches}) for prototype initialization.")
-                    break
-                audio_input_values = batch['audio_input_values'].to(device)
-                audio_attention_mask = batch['audio_attention_mask'].to(device)
-                input_ids = batch['input_ids'].to(device)
-                attention_mask = batch['attention_mask'].to(device)
-                labels_batch = batch['label'].to(device)
-                valid_audio = audio_attention_mask.sum(dim=1) > 0
-                valid_text = attention_mask.sum(dim=1) > 0
-                valid_samples_mask = valid_audio & valid_text
-                audio_input_values = audio_input_values[valid_samples_mask]
-                audio_attention_mask = audio_attention_mask[valid_samples_mask]
-                input_ids = input_ids[valid_samples_mask]
-                attention_mask = attention_mask[valid_samples_mask]
-                labels_batch = labels_batch[valid_samples_mask]
-                if audio_input_values.size(0) == 0:
-                    print(f"Batch {i}: no valid samples after filtering, skipping.")
-                    continue
-                try:
-                    _, fused_features = self(audio_input_values, audio_attention_mask, input_ids, attention_mask)
-                except Exception as e:
-                    print(f"Error during forward pass in init_prototypes for batch {i}: {e}")
-                    break
-                for feature, label in zip(fused_features, labels_batch):
-                    class_features[label.item()].append(feature.cpu())
-                del audio_input_values, audio_attention_mask, input_ids, attention_mask, labels_batch
-                del fused_features
-                torch.cuda.empty_cache()
-        prototype_list = []
-        for class_idx, class_embeds in enumerate(class_features):
-            if not class_embeds:
-                print(f"Warning: No samples found for class {class_idx}. Initializing prototypes randomly.")
-                prototype_list.append(torch.randn(num_prototypes, self.metric_head.embed_dim))
-                continue
-            class_embeds = torch.stack(class_embeds)
-            if len(class_embeds) < num_prototypes:
-                print(f"Warning: Fewer samples ({len(class_embeds)}) than prototypes ({num_prototypes}) for class {class_idx}. Replicating samples.")
-                indices = torch.randint(0, len(class_embeds), (num_prototypes,))
-                proto_class = class_embeds[indices]
-            else:
-                indices = torch.randperm(len(class_embeds))[:num_prototypes]
-                proto_class = class_embeds[indices]
-            prototype_list.append(proto_class)
-        while len(prototype_list) < num_classes:
-            print(f"Warning: Missing prototypes for class {len(prototype_list)}. Initializing randomly.")
-            prototype_list.append(torch.randn(num_prototypes, self.metric_head.embed_dim))
-        proto_tensor = torch.stack(prototype_list).to(device)
-        proto_tensor = proto_tensor.view(num_classes * num_prototypes, self.metric_head.embed_dim)
-        self.metric_head.prototypes.data = proto_tensor
-        print(f"Prototypes initialized: {self.metric_head.prototypes.shape}")

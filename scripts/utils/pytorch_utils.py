@@ -12,7 +12,7 @@ def run_epoch(model, loader, criterion, optimiser=None, scaler=None, device="cud
     for batch_idx, batch in enumerate(loader):
         batch = {k: v.to(device, non_blocking=True) for k, v in batch.items()}
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            logits = model(batch["input_values"], batch["attention_mask"])
+            logits = model(**batch)
             loss = criterion(logits, batch["labels"])
         if is_train:
             optimiser.zero_grad(set_to_none=True)

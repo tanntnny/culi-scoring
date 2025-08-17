@@ -9,6 +9,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from transformers import (
     Wav2Vec2Processor,
@@ -128,7 +129,7 @@ def main():
     # Initialize models, criterion, optimizers, and schedulers
     model = MultimodalModel(
         wav2vec2_encoder=WAV2VEC2_ENCODER,
-        bert_model=BERT_MODEL,
+        text_encoder=BERT_MODEL,
         num_classes=num_classes,
         k=K_PROTOTYPES,
         lstm_hidden_dim=LSTM_HID,
@@ -172,6 +173,10 @@ def main():
         run_dir = get_next_run_dir()
         print(f"Saving all results in {run_dir}")
 
+    # ------------------- DDP -------------------
+    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+    model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+
     # ------------------- Training Loop -------------------
 
     best_val_acc = 0.0
@@ -182,6 +187,7 @@ def main():
 
         train_sampler.set_epoch(epoch)
         val_sampler.set_epoch(epoch)
+
         train_loss, train_acc = run_epoch(model, train_dataloader, criterion, optimizer, scaler, device)
         scheduler.step()
 
