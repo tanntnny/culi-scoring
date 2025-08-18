@@ -92,12 +92,12 @@ class MultimodalModel(nn.Module):
                 ):
         super().__init__()
         self.audio_encoder = Wav2Vec2Model.from_pretrained(wav2vec2_encoder)
-        self.audio_encoder.gradient_checkpointing_enable()
+        # self.audio_encoder.gradient_checkpointing_enable()
         self.audio_encoder.feature_extractor.to(dtype=torch.float32)
         self.audio_lstm = nn.LSTM(self.audio_encoder.config.hidden_size, lstm_hidden_dim, batch_first=True, bidirectional=True)
 
-        self.text_encoder = BertModel.from_pretrained(text_encoder, add_pooling_layer=False)
-        self.text_encoder.gradient_checkpointing_enable()
+        self.text_encoder = BertModel.from_pretrained(text_encoder, add_pooling_layer=False, gradient_checkpointing_enable=False)
+        # self.text_encoder.gradient_checkpointing_enable()
         self.text_lstm = nn.LSTM(self.text_encoder.config.hidden_size, lstm_hidden_dim, batch_first=True, bidirectional=True)
         self.fusion_projection = nn.Sequential(
             nn.Linear(lstm_hidden_dim * 4, lstm_hidden_dim * 2), # (2 * Audio + 2 * Text)
