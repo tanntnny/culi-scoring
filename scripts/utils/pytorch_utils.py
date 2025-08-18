@@ -10,7 +10,9 @@ def run_epoch(model, loader, criterion, optimizer=None, scaler=None, scheduler=N
 
     total_loss, correct, n = 0.0, 0, 0
     for batch_idx, batch in enumerate(loader):
-        batch = {k: v.to(device, non_blocking=True) for k, v in batch.items()}
+        for key, value in batch.items():
+            if torch.is_tensor(value): batch[key] = value.to(device, non_blocking=True)
+
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             logits = model(**batch)
             loss = criterion(logits, batch["labels"])
