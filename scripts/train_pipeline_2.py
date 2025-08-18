@@ -92,6 +92,28 @@ def main():
     BERT_TOKENIZER = args.bert_tokenizer
     BERT_MODEL = args.bert_model
 
+    if is_main:
+        print(f"------------------- Arguments -------------------")
+        print(f"CPUs per task: {CPUS_PER_TASK}")
+        print(f"Training data: {TRAIN_DATA}")
+        print(f"Validation data: {VAL_DATA}")
+        print(f"CEFR label: {CEFR_LABEL}")
+        print(f"Batch size: {BATCH_SIZE}")
+        print(f"Epochs: {EPOCHS}")
+        print(f"Learning rate: {LR}")
+        print(f"Warmup fraction: {WARMUP_FRAC}")
+        print(f"Label weighting alpha: {LW_ALPHA}")
+        print(f"LSTM hidden dim: {LSTM_HID}")
+        print(f"Fusion projection dim: {FUSION_PROJ_DIM}")
+        print(f"PT metric: {PT_METRIC}")
+        print(f"Wav2Vec2 processor: {WAV2VEC2_PROCESSOR}")
+        print(f"Wav2Vec2 encoder: {WAV2VEC2_ENCODER}")
+        print(f"BERT tokenizer: {BERT_TOKENIZER}")
+        print(f"BERT model: {BERT_MODEL}")
+        
+        run_dir = get_next_run_dir()
+        print(f"Saving all results in {run_dir}")
+
     # Setup DDP
     world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
     is_main = rank == 0
@@ -144,41 +166,22 @@ def main():
     warmup_steps = int(total_steps * WARMUP_FRAC)
     scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
 
+    # ------------------- DDP -------------------
+    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+    model = DDP(model, device_ids=[local_rank], output_device=local_rank)
     if is_main:
-        print(f"------------------- Arguments -------------------")
-        print(f"CPUs per task: {CPUS_PER_TASK}")
-        print(f"Training data: {TRAIN_DATA}")
-        print(f"Validation data: {VAL_DATA}")
-        print(f"CEFR label: {CEFR_LABEL}")
-        print(f"Batch size: {BATCH_SIZE}")
-        print(f"Epochs: {EPOCHS}")
-        print(f"Learning rate: {LR}")
-        print(f"Warmup fraction: {WARMUP_FRAC}")
-        print(f"Label weighting alpha: {LW_ALPHA}")
-        print(f"LSTM hidden dim: {LSTM_HID}")
-        print(f"Fusion projection dim: {FUSION_PROJ_DIM}")
-        print(f"PT metric: {PT_METRIC}")
-        print(f"Wav2Vec2 processor: {WAV2VEC2_PROCESSOR}")
-        print(f"Wav2Vec2 encoder: {WAV2VEC2_ENCODER}")
-        print(f"BERT tokenizer: {BERT_TOKENIZER}")
-        print(f"BERT model: {BERT_MODEL}")
-        print(f"-------------------------------------------------")
+        print(f"------------------- Model details & Devices -------------------")
+        print(f"DDP initialized with device {device}") 
         print(f"Model architecture:\n{model.module}")
         num_params = sum(p.numel() for p in model.module.parameters())
         num_trainable = sum(p.numel() for p in model.module.parameters() if p.requires_grad)
         print(f"Total parameters: {num_params:,} | Trainable: {num_trainable:,}")
         print(f"Train samples: {len(train_dataset)} | Validation samples: {len(val_dataset)}")
-        print(f"-------------------------------------------------")
-        
-        run_dir = get_next_run_dir()
-        print(f"Saving all results in {run_dir}")
-
-    # ------------------- DDP -------------------
-    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
-    model = DDP(model, device_ids=[local_rank], output_device=local_rank)
-    print(f"DDP initialized on rank {rank} with device {device}")        
 
     # ------------------- Training Loop -------------------
+
+    if is_main:
+        print(f"------------------- Training Loop -------------------")
 
     best_val_acc = 0.0
     metrics = []
