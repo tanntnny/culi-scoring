@@ -145,77 +145,82 @@ class MultimodalModel(nn.Module):
     def forward(self, audio_embeddings, text_embeddings, ids, labels):
         # 1) Make devices/dtypes consistent
         audio_embeddings = self._cast_audio_inputs(audio_embeddings)
-        text_embeddings = self._cast_text_inputs(text_embeddings)
+        text_embeddings  = self._cast_text_inputs(text_embeddings)
 
-        # 2) AUDIO
-        # If you want AMP: wrap only the transformer stack, not the feature extractor.
+        # 2) AUDIO (encoder -> LSTM -> masked mean pool)
         audio_outputs = self.audio_encoder(
             input_values=audio_embeddings["input_values"],
             attention_mask=audio_embeddings["attention_mask"]
         )
         audio_hidden_states = audio_outputs.last_hidden_state  # (B, T_feat, H)
-        feature_level_mask = self._get_feature_level_mask(audio_embeddings["attention_mask"])
-
-        batch_size = audio_hidden_states.size(0)
+        B, T_feat, _ = audio_hidden_states.shape
         device = audio_hidden_states.device
-        audio_feature_lengths = torch.tensor([audio_hidden_states.shape[1]] * batch_size, device=device)
+        adtype = audio_hidden_states.dtype
 
-        audio_lstm_out = torch.zeros(batch_size, audio_hidden_states.size(1), self.audio_lstm.hidden_size * 2, device=device)
-        audio_pooled = torch.zeros(batch_size, self.audio_lstm.hidden_size * 2, device=device)
+        # feature-level mask (B, T_feat) in {0,1}
+        feature_level_mask = self._get_feature_level_mask(audio_embeddings["attention_mask"])  # long/bool
+        audio_feature_lengths = feature_level_mask.sum(dim=1)  # (B,)
+
+        # buffers that match dtype/device of the hidden states
+        audio_pooled = audio_hidden_states.new_zeros(B, self.audio_lstm.hidden_size * 2)
 
         valid_audio_indices = audio_feature_lengths > 0
         if valid_audio_indices.any():
-            valid_audio_hidden = audio_hidden_states[valid_audio_indices]
-            valid_audio_lengths = audio_feature_lengths[valid_audio_indices]
-            valid_feature_mask = feature_level_mask[valid_audio_indices]
+            valid_audio_hidden  = audio_hidden_states[valid_audio_indices]               # (Bv, T_feat, H)
+            valid_audio_lengths = audio_feature_lengths[valid_audio_indices]             # (Bv,)
+            valid_feature_mask  = feature_level_mask[valid_audio_indices]                # (Bv, T_feat)
 
             audio_packed = nn.utils.rnn.pack_padded_sequence(
-                valid_audio_hidden, valid_audio_lengths.cpu(), batch_first=True, enforce_sorted=False
+                valid_audio_hidden, valid_audio_lengths.to("cpu"), batch_first=True, enforce_sorted=False
             )
             audio_lstm_out_packed, _ = self.audio_lstm(audio_packed)
-            audio_lstm_out_valid, _ = torch.nn.utils.rnn.pad_packed_sequence(audio_lstm_out_packed, batch_first=True)
-
-            audio_lstm_out[valid_audio_indices] = audio_lstm_out_valid
-            summed_audio = (audio_lstm_out_valid * valid_feature_mask.unsqueeze(-1).float()).sum(dim=1)
-            counts_audio = valid_feature_mask.sum(dim=1).unsqueeze(-1).clamp(min=1e-9).float()
-            valid_audio_pooled = summed_audio / counts_audio
-            audio_pooled[valid_audio_indices] = valid_audio_pooled
+            audio_lstm_out_valid, _ = nn.utils.rnn.pad_packed_sequence(audio_lstm_out_packed, batch_first=True)
+            # pool in fp32 for numerical stability, then cast back
+            vf_mask = valid_feature_mask.unsqueeze(-1).float()
+            summed_audio  = (audio_lstm_out_valid.float() * vf_mask).sum(dim=1)
+            counts_audio  = vf_mask.sum(dim=1).clamp(min=1e-6)
+            pooled_audio_valid = (summed_audio / counts_audio).to(adtype)
+            audio_pooled[valid_audio_indices] = pooled_audio_valid
         else:
-            print("\n[Warning] No valid audio sequences in this batch!")
+            # no valid sequences; leave zeros
+            pass
 
-        # 3) TEXT
+        # 3) TEXT (encoder -> LSTM -> masked mean pool)
         text_outputs = self.text_encoder(
             input_ids=text_embeddings["input_ids"],
             attention_mask=text_embeddings["attention_mask"]
         )
-        text_hidden_states = text_outputs.last_hidden_state
-        text_lengths = text_embeddings["attention_mask"].sum(dim=1)
+        text_hidden_states = text_outputs.last_hidden_state  # (B, T_txt, Ht)
+        B, T_txt, _ = text_hidden_states.shape
+        tdtype = text_hidden_states.dtype
 
-        text_lstm_out = torch.zeros(batch_size, text_hidden_states.size(1), self.text_lstm.hidden_size * 2, device=device)
-        text_pooled = torch.zeros(batch_size, self.text_lstm.hidden_size * 2, device=device)
+        text_lengths = text_embeddings["attention_mask"].sum(dim=1)  # (B,)
+        text_pooled = text_hidden_states.new_zeros(B, self.text_lstm.hidden_size * 2)
 
         valid_text_indices = text_lengths > 0
         if valid_text_indices.any():
-            valid_text_hidden = text_hidden_states[valid_text_indices]
-            valid_text_lengths = text_lengths[valid_text_indices]
-            valid_text_mask   = text_embeddings["attention_mask"][valid_text_indices]
+            valid_text_hidden = text_hidden_states[valid_text_indices]                # (Bv, T_txt, Ht)
+            valid_text_lengths = text_lengths[valid_text_indices]                     # (Bv,)
+            valid_text_mask = text_embeddings["attention_mask"][valid_text_indices]   # (Bv, T_txt)
 
             text_packed = nn.utils.rnn.pack_padded_sequence(
-                valid_text_hidden, valid_text_lengths.cpu(), batch_first=True, enforce_sorted=False
+                valid_text_hidden, valid_text_lengths.to("cpu"), batch_first=True, enforce_sorted=False
             )
             text_lstm_out_packed, _ = self.text_lstm(text_packed)
-            text_lstm_out_valid, _ = torch.nn.utils.rnn.pad_packed_sequence(text_lstm_out_packed, batch_first=True)
+            text_lstm_out_valid, _ = nn.utils.rnn.pad_packed_sequence(text_lstm_out_packed, batch_first=True)
 
-            text_lstm_out[valid_text_indices] = text_lstm_out_valid
-            summed_text = (text_lstm_out_valid * valid_text_mask.unsqueeze(-1).float()).sum(dim=1)
-            counts_text = valid_text_mask.sum(dim=1).unsqueeze(-1).clamp(min=1e-9).float()
-            valid_text_pooled = summed_text / counts_text
-            text_pooled[valid_text_indices] = valid_text_pooled
+            vt_mask = valid_text_mask.unsqueeze(-1).float()
+            summed_text = (text_lstm_out_valid.float() * vt_mask).sum(dim=1)
+            counts_text = vt_mask.sum(dim=1).clamp(min=1e-6)
+            pooled_text_valid = (summed_text / counts_text).to(tdtype)
+            text_pooled[valid_text_indices] = pooled_text_valid
+        else:
+            pass
 
-        # 4) FUSION (no undefined projections)
-        combined_features = torch.cat((audio_pooled, text_pooled), dim=1)  # shape = (B, 4H)
+        # 4) FUSION
+        combined_features = torch.cat((audio_pooled, text_pooled), dim=1)  # (B, 4 * lstm_hidden_dim)
         fused_features = self.fusion_projection(combined_features)
 
-        # 5) CLASSIFIER
-        logits = self.metric_head(fused_features)
+        # 5) CLASSIFIER (run head in fp32 for stable distances)
+        logits = self.metric_head(fused_features.float())
         return logits
