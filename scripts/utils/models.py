@@ -143,8 +143,6 @@ class MultimodalModel(nn.Module):
             return mask
 
     def forward(self, audio_embeddings, text_embeddings, ids, labels):
-        print(audio_embeddings.shape)
-        print(text_embeddings.shape)
         # 1) Make devices/dtypes consistent
         audio_embeddings = self._cast_audio_inputs(audio_embeddings)
         text_embeddings  = self._cast_text_inputs(text_embeddings)
