@@ -188,14 +188,26 @@ def main():
         train_sampler.set_epoch(epoch)
         val_sampler.set_epoch(epoch)
 
-        train_loss, train_acc = run_epoch(model, train_dataloader, criterion, optimizer, scaler, device)
-        scheduler.step()
+        train_loss, train_acc = run_epoch(
+            model=model,
+            loader=train_dataloader,
+            criterion=criterion,
+            optimizer=optimizer,
+            scaler=scaler,
+            scheduler=scheduler,
+            device=device
+        )
 
-        val_loss: float
-        val_acc: float
+        val_loss = 0
+        val_acc = 0
         with torch.no_grad():
             if is_main:
-                val_loss, val_acc = run_epoch(model, val_dataloader, criterion, None, None, device)
+                val_loss, val_acc = run_epoch(
+                    model=model,
+                    loader=val_dataloader,
+                    criterion=criterion,
+                    device=device
+                )
                 torch.cuda.empty_cache()
         tensor_metrics = torch.tensor([val_loss, val_acc], dtype=torch.float32, device=device)
         dist.broadcast(tensor_metrics, src=0)

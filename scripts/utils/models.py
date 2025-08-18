@@ -123,14 +123,14 @@ class MultimodalModel(nn.Module):
             return mask
 
     def forward(self, audio_embeddings, text_embeddings, ids, labels):
-        batch_size = audio_embeddings.size(0)
-        device = audio_embeddings.device
+        batch_size = audio_embeddings['input_values'].size(0)
+        device = audio_embeddings['input_values'].device
 
         audio_outputs = self.audio_encoder(input_values=audio_embeddings["input_values"], attention_mask=audio_embeddings["attention_mask"])
         audio_hidden_states = audio_outputs.last_hidden_state
         feature_level_mask = self._get_feature_level_mask(audio_embeddings["attention_mask"])
         audio_feature_lengths = torch.tensor(
-            [audio_hidden_states.shape[1]] * len(audio_hidden_states),
+            [audio_hidden_states.shape[1]] * batch_size,
             device=device
         )
         audio_lstm_out = torch.zeros(batch_size, audio_hidden_states.size(1), self.audio_lstm.hidden_size * 2, device=device)
@@ -184,4 +184,4 @@ class MultimodalModel(nn.Module):
         combined_features = torch.cat((audio_features, text_features), dim=1)
         fused_features = self.fusion_projection(combined_features)
         logits = self.metric_head(fused_features)
-        return logits, fused_features
+        return logits

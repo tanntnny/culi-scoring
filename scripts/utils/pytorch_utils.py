@@ -4,8 +4,8 @@ import pandas as pd
 import numpy as np
 import torch.distributed as dist
 
-def run_epoch(model, loader, criterion, optimiser=None, scaler=None, device="cuda"):
-    is_train = optimiser is not None
+def run_epoch(model, loader, criterion, optimizer=None, scaler=None, scheduler=None, device="cuda"):
+    is_train = optimizer is not None
     model.train() if is_train else model.eval()
 
     total_loss, correct, n = 0.0, 0, 0
@@ -15,14 +15,17 @@ def run_epoch(model, loader, criterion, optimiser=None, scaler=None, device="cud
             logits = model(**batch)
             loss = criterion(logits, batch["labels"])
         if is_train:
-            optimiser.zero_grad(set_to_none=True)
+            optimizer.zero_grad(set_to_none=True)
             if scaler:
                 scaler.scale(loss).backward()
-                scaler.step(optimiser)
+                scaler.step(optimizer)
                 scaler.update()
             else:
                 loss.backward()
-                optimiser.step()
+                optimizer.step()
+            if scheduler:
+                scheduler.step()
+
         preds = logits.argmax(1)
         total_loss += loss.item() * preds.size(0)
         correct += (preds == batch["labels"]).sum().item()

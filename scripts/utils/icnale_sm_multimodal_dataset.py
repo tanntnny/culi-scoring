@@ -52,11 +52,11 @@ def create_collate_fn(
         audio_processor: Path,
         text_tokenizer: Path
 ):
-    audio_processor = Wav2Vec2Processor.from_pretrained(audio_processor)
-    text_tokenizer = BertTokenizer.from_pretrained(text_tokenizer)
+    audio_processor: Wav2Vec2Processor = Wav2Vec2Processor.from_pretrained(audio_processor)
+    text_tokenizer: BertTokenizer = BertTokenizer.from_pretrained(text_tokenizer)
     def collate_fn(batch):
         audio_paths, text_paths, ids, labels = zip(*batch)
-        waveforms = [np.zeros(16000) for _ in audio_paths]
+        waveforms = [np.zeros(16000, np.float64) for _ in audio_paths]
         texts = ['' for _ in text_paths]
         labels = torch.tensor(labels, dtype=torch.long)
         for idx, audio_path in enumerate(audio_paths):
@@ -69,18 +69,23 @@ def create_collate_fn(
                 texts[idx] = f.read()
 
         # Create embedding
-        audio_embeddings = audio_processor(waveforms, sampling_rate=16000, return_tensors="pt", padding=True, return_attention_mask=True)
-        text_tokens = [text_tokenizer(text, truncation=True, return_tensors='pt') for text in texts]
-        text_embedding = []
-        for text_token in text_tokens:
-            text_embedding.append({
-                'input_ids': text_token['input_ids'].squeeze(0),
-                'attention_mask': text_token['attention_mask'].squeeze(0)
-            })
+        audio_embeddings = audio_processor(
+            waveforms,
+            sampling_rate=16000,
+            return_tensors="pt",
+            padding=True,
+            return_attention_mask=True
+        )
+        text_embeddings = text_tokenizer(
+            list(texts),
+            truncation=True,
+            padding=True,
+            return_tensor="pt",
+        )
         
         return {
             'audio_embeddings': audio_embeddings,
-            'text_embeddings': text_embedding,
+            'text_embeddings': text_embeddings,
             'ids': ids,
             'labels': labels
         }
