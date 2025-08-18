@@ -93,7 +93,7 @@ class MultimodalModel(nn.Module):
         super().__init__()
         self.audio_encoder = Wav2Vec2Model.from_pretrained(wav2vec2_encoder)
         self.audio_encoder.gradient_checkpointing_enable()
-        self.audio_encode.feature_extractor.to(dtype=torch.float32)
+        self.audio_encoder.feature_extractor.to(dtype=torch.float32)
         self.audio_lstm = nn.LSTM(self.audio_encoder.config.hidden_size, lstm_hidden_dim, batch_first=True, bidirectional=True)
 
         self.text_encoder = BertModel.from_pretrained(text_encoder)
