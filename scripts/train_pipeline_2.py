@@ -97,8 +97,6 @@ def main():
     world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
     is_main = rank == 0
     num_workers = CPUS_PER_TASK
-    if is_main:
-        print("Using GPU" if torch.cuda.is_available() else "No CUDA available, using CPU.")
     device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
 
     if is_main:
@@ -170,8 +168,9 @@ def main():
     scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
 
     # ------------------- DDP -------------------
-    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
     model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+
     if is_main:
         print(f"------------------- Model details & Devices -------------------")
         print(f"DDP initialized with device {device}") 
