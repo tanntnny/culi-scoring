@@ -93,9 +93,12 @@ def main():
     BERT_MODEL = args.bert_model
 
     # Setup DDP
+
     world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
     is_main = rank == 0
     num_workers = CPUS_PER_TASK
+    if is_main:
+        print("Using GPU" if torch.cuda.is_available() else "No CUDA available, using CPU.")
     device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
 
     if is_main:
