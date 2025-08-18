@@ -119,6 +119,13 @@ class MultimodalModel(nn.Module):
             "attention_mask": audio_embeddings["attention_mask"].to(device, dtype=torch.long, non_blocking=True),
         }
 
+    def _cast_text_inputs(self, text_embeddings):
+        dev = self._module_device()
+        return {
+            "input_ids": text_embeddings["input_ids"].to(dev, dtype=torch.long, non_blocking=True),
+            "attention_mask": text_embeddings["attention_mask"].to(dev, dtype=torch.long, non_blocking=True),
+        }
+
     def _get_feature_level_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
         with torch.no_grad():
             input_lengths = attention_mask.sum(dim=1)
