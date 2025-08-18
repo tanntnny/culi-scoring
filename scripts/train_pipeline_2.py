@@ -221,20 +221,16 @@ def main():
             device=device
         )
 
-        val_loss = 0
-        val_acc = 0
+        val_loss = 0.0
+        val_acc = 0.0
         with torch.no_grad():
-            if is_main:
-                val_loss, val_acc = run_epoch(
-                    model=model,
-                    loader=val_dataloader,
-                    criterion=criterion,
-                    device=device
-                )
-                torch.cuda.empty_cache()
-        tensor_metrics = torch.tensor([val_loss, val_acc], dtype=torch.float32, device=device)
-        dist.broadcast(tensor_metrics, src=0)
-        val_loss, val_acc = tensor_metrics.tolist()
+            val_loss, val_acc = run_epoch(
+                model=model,
+                loader=val_dataloader,
+                criterion=criterion,
+                device=device
+            )
+            torch.cuda.empty_cache()
 
         if is_main:
             metrics.append({
