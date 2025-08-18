@@ -253,9 +253,21 @@ def main():
     # Save metrics to the run directory
     if is_main:
         metrics_path = os.path.join(run_dir, "metrics.json")
+        configuration_path = os.path.join(run_dir, "configuration.json")
         with open(metrics_path, "w") as f:
             json.dump(metrics, f, indent=2)
+        with open(configuration_path, "w") as f:
+            json.dump({
+                "wav2vec2_encoder": WAV2VEC2_ENCODER,
+                "text_encoder": BERT_MODEL,
+                "num_classes": num_classes,
+                "k": K_PROTOTYPES,
+                "lstm_hidden_dim": LSTM_HID,
+                "fusion_proj_dim": FUSION_PROJ_DIM,
+                "pt_metric": PT_METRIC,
+            }, f, indent=2)
         print(f"Metrics saved to {metrics_path}")
+        print(f"Configuration saved to {configuration_path}")
 
     dist.destroy_process_group()
 
