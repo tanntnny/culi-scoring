@@ -185,8 +185,8 @@ def main():
         model,
         device_ids=[local_rank],
         output_device=local_rank,
-        find_unused_parameters=True,
     )
+    model._set_static_graph()
 
     if is_main:
         print(f"------------------- Model details & Devices -------------------")
@@ -237,11 +237,6 @@ def main():
         val_loss, val_acc = tensor_metrics.tolist()
 
         if is_main:
-            print(
-                f"Epoch {epoch+1}: Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f}, "
-                f"Val Loss={val_loss:.4f}, Val Acc={val_acc:.4f}"
-            )
-
             metrics.append({
                 "epoch": epoch+1,
                 "train_loss": train_loss,
