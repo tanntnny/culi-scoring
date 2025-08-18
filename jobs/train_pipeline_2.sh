@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=train_baseline_1
-#SBATCH --output=logs/train_baseline_%j.out
-#SBATCH --error=logs/train_baseline_%j.err
+#SBATCH --job-name=train_pipeline_2
+#SBATCH --output=logs/train_pipeline_2_%j.out
+#SBATCH --error=logs/train_pipeline_2_%j.err
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:4
 #SBATCH --nodes=2
