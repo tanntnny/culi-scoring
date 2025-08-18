@@ -80,7 +80,7 @@ def create_collate_fn(
             list(texts),
             truncation=True,
             padding=True,
-            return_tensor="pt",
+            return_tensors="pt",
         )
         
         return {
