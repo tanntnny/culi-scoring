@@ -128,8 +128,20 @@ def main():
     collate_fn = create_collate_fn(WAV2VEC2_PROCESSOR, BERT_TOKENIZER)
     train_dataset = MultimodalSMDataset(TRAIN_DATA, CEFR_LABEL)
     val_dataset = MultimodalSMDataset(VAL_DATA, CEFR_LABEL)
-    train_sampler = DistributedSampler(train_dataset, shuffle=True, num_replicas=world_size, rank=rank)
-    val_sampler = DistributedSampler(val_dataset, shuffle=False, num_replicas=world_size, rank=rank)
+    train_sampler = DistributedSampler(
+        train_dataset,
+        shuffle=True,
+        num_replicas=world_size,
+        rank=rank,
+        drop_last=True,
+    )
+    val_sampler = DistributedSampler(
+        val_dataset,
+        shuffle=False,
+        num_replicas=world_size,
+        rank=rank,
+        drop_last=False,
+    )
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=BATCH_SIZE,
@@ -169,7 +181,12 @@ def main():
 
     # ------------------- DDP -------------------
     model = model.to(device)
-    model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+    model = DDP(
+        model,
+        device_ids=[local_rank],
+        output_device=local_rank,
+        find_unused_parameters=True,
+    )
 
     if is_main:
         print(f"------------------- Model details & Devices -------------------")
