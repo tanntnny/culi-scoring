@@ -92,6 +92,12 @@ def main():
     BERT_TOKENIZER = args.bert_tokenizer
     BERT_MODEL = args.bert_model
 
+    # Setup DDP
+    world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
+    is_main = rank == 0
+    num_workers = CPUS_PER_TASK
+    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+
     if is_main:
         print(f"------------------- Arguments -------------------")
         print(f"CPUs per task: {CPUS_PER_TASK}")
@@ -113,12 +119,6 @@ def main():
         
         run_dir = get_next_run_dir()
         print(f"Saving all results in {run_dir}")
-
-    # Setup DDP
-    world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
-    is_main = rank == 0
-    num_workers = CPUS_PER_TASK
-    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
 
     # Prepare Datasets, Dataloaders, Datasamplers
     cefr_label_df = pd.read_csv(CEFR_LABEL)
