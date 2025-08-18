@@ -176,6 +176,7 @@ def main():
     # ------------------- DDP -------------------
     device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
     model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+    print(f"DDP initialized on rank {rank} with device {device}")        
 
     # ------------------- Training Loop -------------------
 
