@@ -190,10 +190,6 @@ def main():
 
     if is_main:
         print(f"------------------- Model details & Devices -------------------")
-        names = [n for n, _ in model.module.named_parameters()]
-        print("Param 416:", names[416])
-        print("Param 417:", names[417])
-
         print(f"DDP initialized with device {device}") 
         print(f"Model architecture:\n{model.module}")
         num_params = sum(p.numel() for p in model.module.parameters())
