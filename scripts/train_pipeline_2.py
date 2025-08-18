@@ -137,7 +137,7 @@ def main():
         collate_fn=collate_fn,
         num_workers=num_workers,
         pin_memory=True,
-        drop_last=False,
+        drop_last=True,
     )
     val_dataloader = DataLoader(
         val_dataset,
