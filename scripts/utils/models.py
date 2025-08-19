@@ -107,6 +107,12 @@ class MultimodalModel(nn.Module):
             nn.LayerNorm(fusion_proj_dim)
         )
         self.metric_head = PrototypicalClassifier(embed_dim=fusion_proj_dim, num_classes=num_classes, k=k, metric=pt_metric)
+        self.mlp_head = nn.Sequential(
+            nn.Linear(fusion_proj_dim, 128),
+            nn.GELU(),
+            nn.Linear(128, num_classes),
+            nn.LayerNorm(num_classes)
+        )
 
     def _module_device(self):
         return next(self.parameters()).device
@@ -220,7 +226,9 @@ class MultimodalModel(nn.Module):
         # 4) FUSION
         combined_features = torch.cat((audio_pooled, text_pooled), dim=1)  # (B, 4 * lstm_hidden_dim)
         fused_features = self.fusion_projection(combined_features)
+        
+        logits = self.mlp_head(fused_features.float())
 
         # 5) CLASSIFIER (run head in fp32 for stable distances)
-        logits = self.metric_head(fused_features.float())
+        # logits = self.metric_head(fused_features.float())
         return logits
