@@ -46,6 +46,7 @@ def create_collate_fn(
     def collate_fn(batch):
         audio_paths, ids, labels = zip(*batch)
         waveforms = [np.zeros(16000, np.float64) for _ in audio_paths]
+        labels = torch.tensor(labels, dtype=torch.long)
         for idx, audio_path in enumerate(audio_paths):
             try:
                 waveforms[idx], _ = audio_to_tensor(audio_path)
