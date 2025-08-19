@@ -70,8 +70,19 @@ class SpeechModel(nn.Module):
             mask = (x.abs() > 0).any(dim=1).long()  # (B, T_feat)
             return mask
 
+    def _module_device(self):
+        return next(self.parameters()).device
+    
+    def _cast_audio_inputs(self, audio_embeddings):
+        device = self._module_device()
+        enc_dtype = next(self.encoder.parameters()).dtype
+        return {
+            "input_values": audio_embeddings["input_values"].to(device, dtype=enc_dtype, non_blocking=True),
+            "attention_mask": audio_embeddings["attention_mask"].to(device, dtype=torch.long, non_blocking=True),
+        }
 
     def forward(self, audio_embeddings, **kwargs) -> torch.Tensor:
+        audio_embeddings = self._cast_audio_inputs(audio_embeddings)
         out = self.encoder(input_values=audio_embeddings["input_values"], attention_mask=audio_embeddings["attention_mask"])
         hidden = out.last_hidden_state  # (B, T_feat, H)
         feat_mask = self._get_feature_level_mask(audio_embeddings["attention_mask"])  # (B, T_feat)
@@ -127,10 +138,10 @@ class MultimodalModel(nn.Module):
         }
 
     def _cast_text_inputs(self, text_embeddings):
-        dev = self._module_device()
+        device = self._module_device()
         return {
-            "input_ids": text_embeddings["input_ids"].to(dev, dtype=torch.long, non_blocking=True),
-            "attention_mask": text_embeddings["attention_mask"].to(dev, dtype=torch.long, non_blocking=True),
+            "input_ids": text_embeddings["input_ids"].to(device, dtype=torch.long, non_blocking=True),
+            "attention_mask": text_embeddings["attention_mask"].to(device, dtype=torch.long, non_blocking=True),
         }
 
     def _get_feature_level_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:

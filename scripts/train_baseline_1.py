@@ -1,103 +1,143 @@
 import argparse
 import os
+import json
 
 import pandas as pd
+
 import torch
-from sklearn.model_selection import train_test_split
-from torch import nn
-from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from transformers import (
-    get_cosine_schedule_with_warmup
+    get_cosine_schedule_with_warmup,
 )
-from scripts.utils.models import SpeechModel
-from scripts.utils.icnale_sm_audio_dataset import ICNALE_SM_Dataset, collate_fn
+from scripts.utils.models import (
+    SpeechModel,
+)
+from scripts.utils.icnale_sm_multimodal_dataset import (
+    MultimodalSMDataset,
+    create_collate_fn,
+)
 from scripts.utils.pytorch_utils import (
-    get_label_count,
     run_epoch,
+    setup_ddp_from_slurm,
     save_model,
-    setup_ddp_from_slurm
+)
+
+from scripts.utils.script_utils import (
+    get_next_run_dir
 )
 
 # ------------------- Utilities -------------------
 
-def get_next_run_dir(base_dir="runs"):
-    os.makedirs(base_dir, exist_ok=True)
-    existing = [d for d in os.listdir(base_dir) if d.startswith("run") and os.path.isdir(os.path.join(base_dir, d))]
-    run_nums = [int(d[3:]) for d in existing if d[3:].isdigit()]
-    next_num = max(run_nums, default=0) + 1
-    run_dir = os.path.join(base_dir, f"run{next_num}")
-    os.makedirs(run_dir, exist_ok=True)
-    return run_dir
+def compute_loss_weights(labels, num_classes, alpha=0.5, device='cpu'):
+    label_count = torch.zeros(num_classes)
+    for label in labels:
+        label_count[label] += 1
+    label_count = label_count.float()
+    label_count_pow = label_count.pow(alpha)
+    lw_weights = label_count_pow / label_count_pow.sum()
+    lw_weights = lw_weights / (label_count + 1e-8)
+    lw_weights = lw_weights.to(device)
+    return lw_weights
 
 # ------------------- Main -------------------
 
 def main():
     # Parse CLI arguments
     parser = argparse.ArgumentParser(description="Train a baseline model on ICNALE-SM dataset (SLURM DDP).")
+    parser.add_argument("--cpus-per-task", type=int, default=4, help="Number of CPU cores per task.")
+
     parser.add_argument("--train-data", type=str, required=True, help="Path to the ICNALE-SM training dataset configuration.")
     parser.add_argument("--val-data", type=str, required=True, help="Path to the ICNALE-SM validation dataset configuration.")
+    parser.add_argument("--cefr-label", type=str, default='assets/cefr_label.csv', help="Path to the CEFR label CSV file.")
+
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size for training and validation.")
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs.")
     parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate for the optimizer.")
     parser.add_argument("--warmup-frac", type=float, default=0.1, help="Fraction of total steps for learning rate warmup.")
     parser.add_argument("--lw-alpha", type=float, default=1, help="Loss re-weighting alpha parameter.")
+
+    parser.add_argument("--wav2vec2-processor", type=str, default="models/wav2vec2-processor", help="Path to the Wav2Vec2 processor directory.")
+    parser.add_argument("--wav2vec2-encoder", type=str, default="models/wav2vec2-model", help="Path to the Wav2Vec2 encoder/model directory.")
+    parser.add_argument("--k-prototypes", type=int, default=3, help="Number of prototypes for the Prototypical Network.")
+    parser.add_argument("--pt-metric", type=str, default="sed", help="Metric for the Prototypical Network (e.g., 'sed' or 'cos').")
     args = parser.parse_args()
 
-    # Initialize DDP using SLURM-style env vars
-    world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
-    is_main = rank == 0
-
-    if is_main:
-        print("Loading Wav2Vec2 processor and CEFR labels.")
-    global cefr_label
-    try:
-        cefr_label = pd.read_csv("assets/cefr_label.csv")
-    except FileNotFoundError:
-        if is_main:
-            print("File 'assets/cefr_label.csv' not found. Please ensure the file exists and is accessible.")
-        # Ensure all ranks exit coherently
-        dist.destroy_process_group()
-        exit(1)
-
-    # Define Hyperparameters
-    NUM_CLASSES = len(cefr_label)
-    K_PROTOTYPES = 3
+    # Arguments & Hyperparameters
+    CPUS_PER_TASK = args.cpus_per_task
+    TRAIN_DATA = args.train_data
+    VAL_DATA = args.val_data
+    CEFR_LABEL = args.cefr_label
+    K_PROTOTYPES = args.k_prototypes
     BATCH_SIZE = args.batch_size
     EPOCHS = args.epochs
     LR = args.lr
     WARMUP_FRAC = args.warmup_frac
     LW_ALPHA = args.lw_alpha
+    PT_METRIC = args.pt_metric
+    WAV2VEC2_PROCESSOR = args.wav2vec2_processor
+    WAV2VEC2_ENCODER = args.wav2vec2_encoder
 
-    # Prepare dataset configuration
-    train_data_config = pd.read_csv(args.train_data)
-    val_data_config = pd.read_csv(args.val_data)
+    # Setup DDP
 
-    # Create datasets and loaders
-    train_dataset = ICNALE_SM_Dataset(train_data_config, cefr_label)
-    val_dataset = ICNALE_SM_Dataset(val_data_config, cefr_label)
+    world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
+    is_main = rank == 0
+    num_workers = CPUS_PER_TASK
+    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
 
-    num_workers = int(os.environ.get("SLURM_CPUS_PER_TASK", "4"))
+    if is_main:
+        print(f"------------------- Arguments -------------------")
+        print(f"CPUs per task: {CPUS_PER_TASK}")
+        print(f"Training data: {TRAIN_DATA}")
+        print(f"Validation data: {VAL_DATA}")
+        print(f"CEFR label: {CEFR_LABEL}")
+        print(f"Batch size: {BATCH_SIZE}")
+        print(f"Epochs: {EPOCHS}")
+        print(f"Learning rate: {LR}")
+        print(f"Warmup fraction: {WARMUP_FRAC}")
+        print(f"Label weighting alpha: {LW_ALPHA}")
+        print(f"PT metric: {PT_METRIC}")
+        print(f"Wav2Vec2 processor: {WAV2VEC2_PROCESSOR}")
+        print(f"Wav2Vec2 encoder: {WAV2VEC2_ENCODER}")
+        
+        run_dir = get_next_run_dir()
+        print(f"Saving all results in {run_dir}")
 
-    train_sampler = torch.utils.data.distributed.DistributedSampler(
-        train_dataset, num_replicas=world_size, rank=rank, shuffle=True
+    # Prepare Datasets, Dataloaders, Datasamplers
+    cefr_label_df = pd.read_csv(CEFR_LABEL)
+    num_classes = len(cefr_label_df)
+
+    collate_fn = create_collate_fn(WAV2VEC2_PROCESSOR, BERT_TOKENIZER)
+    train_dataset = MultimodalSMDataset(TRAIN_DATA, CEFR_LABEL)
+    val_dataset = MultimodalSMDataset(VAL_DATA, CEFR_LABEL)
+    train_sampler = DistributedSampler(
+        train_dataset,
+        shuffle=True,
+        num_replicas=world_size,
+        rank=rank,
+        drop_last=True,
     )
-    val_sampler = torch.utils.data.distributed.DistributedSampler(
-        val_dataset, num_replicas=world_size, rank=rank, shuffle=False
+    val_sampler = DistributedSampler(
+        val_dataset,
+        shuffle=False,
+        num_replicas=world_size,
+        rank=rank,
+        drop_last=False,
     )
-
-    train_loader = DataLoader(
+    train_dataloader = DataLoader(
         train_dataset,
         batch_size=BATCH_SIZE,
         sampler=train_sampler,
         collate_fn=collate_fn,
         num_workers=num_workers,
         pin_memory=True,
-        drop_last=False,
+        drop_last=True,
     )
-    
-    val_loader = DataLoader(
+    val_dataloader = DataLoader(
         val_dataset,
         batch_size=BATCH_SIZE,
         sampler=val_sampler,
@@ -107,46 +147,41 @@ def main():
         drop_last=False,
     )
 
-    # Initialize model, criterion, optimiser, scaler, and scheduler
-    device = torch.device(f"cuda:{local_rank}")
-    model = SpeechModel(num_classes=NUM_CLASSES, k=K_PROTOTYPES).to(device)
-    model = DDP(model, device_ids=[local_rank])
+    # Initialize models, criterion, optimizers, and schedulers
+    model = SpeechModel(
+        num_classes=num_classes
+    )
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
+    scaler = torch.cuda.amp.GradScaler()
 
-    # Loss Re-Weighting
-    label_count = get_label_count(train_data_config, cefr_label).float()
-    label_count_pow = label_count.pow(LW_ALPHA)
-    lw_weights = label_count_pow / label_count_pow.sum()
-    lw_weights = lw_weights / (label_count + 1e-8)
-    lw_weights = lw_weights.to(device)
+    total_steps = EPOCHS * len(train_dataloader)
+    warmup_steps = int(total_steps * WARMUP_FRAC)
+    scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
 
-    # Log model architecture and parameter count
+    # ------------------- DDP -------------------
+    model = model.to(device)
+    model = DDP(
+        model,
+        device_ids=[local_rank],
+        output_device=local_rank,
+    )
+    model._set_static_graph()
+
     if is_main:
+        print(f"------------------- Model details & Devices -------------------")
+        print(f"DDP initialized with device {device}") 
         print(f"Model architecture:\n{model.module}")
         num_params = sum(p.numel() for p in model.module.parameters())
         num_trainable = sum(p.numel() for p in model.module.parameters() if p.requires_grad)
         print(f"Total parameters: {num_params:,} | Trainable: {num_trainable:,}")
-        print(f"Train samples: {len(train_data_config)} | Validation samples: {len(val_data_config)}")
-        print(f"Unique train labels: {train_data_config['label'].nunique()} | Unique val labels: {val_data_config['label'].nunique()}")
-        print(f"Train label distribution:\n{train_data_config['label'].value_counts().to_string()}\n")
-        print(f"Val label distribution:\n{val_data_config['label'].value_counts().to_string()}\n")
+        print(f"Train samples: {len(train_dataset)} | Validation samples: {len(val_dataset)}")
 
+    # ------------------- Training Loop -------------------
 
-    criterion = nn.CrossEntropyLoss(weight=lw_weights)
-    optimiser = torch.optim.AdamW(model.parameters(), lr=LR)
-    scaler = torch.cuda.amp.GradScaler()
-
-    total_steps = EPOCHS * len(train_loader)
-    warmup_steps = int(total_steps * WARMUP_FRAC)
-    scheduler = get_cosine_schedule_with_warmup(
-        optimiser, num_warmup_steps=warmup_steps, num_training_steps=total_steps
-    )
-
-    # Prepare run directory
     if is_main:
-        run_dir = get_next_run_dir()
-        print(f"Saving all results to {run_dir}")
+        print(f"------------------- Training Loop -------------------")
 
-    # Train and evaluate
     best_val_acc = 0.0
     metrics = []
     for epoch in range(EPOCHS):
@@ -156,26 +191,28 @@ def main():
         train_sampler.set_epoch(epoch)
         val_sampler.set_epoch(epoch)
 
-        train_loss, train_acc = run_epoch(model, train_loader, criterion, optimiser, scaler, device)
-        scheduler.step()
+        train_loss, train_acc = run_epoch(
+            model=model,
+            loader=train_dataloader,
+            criterion=criterion,
+            optimizer=optimizer,
+            scaler=scaler,
+            scheduler=scheduler,
+            device=device
+        )
 
         val_loss = 0.0
         val_acc = 0.0
-
         with torch.no_grad():
-            if is_main:
-                val_loss, val_acc = run_epoch(model, val_loader, criterion, None, None, device)
-                torch.cuda.empty_cache()
-        tensor_metrics = torch.tensor([val_loss, val_acc], dtype=torch.float32, device=device)
-        dist.broadcast(tensor_metrics, src=0)
-        val_loss, val_acc = tensor_metrics.tolist()
+            val_loss, val_acc = run_epoch(
+                model=model,
+                loader=val_dataloader,
+                criterion=criterion,
+                device=device
+            )
+            torch.cuda.empty_cache()
 
         if is_main:
-            print(
-                f"Epoch {epoch+1}: Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f}, "
-                f"Val Loss={val_loss:.4f}, Val Acc={val_acc:.4f}"
-            )
-
             metrics.append({
                 "epoch": epoch+1,
                 "train_loss": train_loss,
@@ -193,13 +230,25 @@ def main():
                 f"Epoch {epoch+1}/{EPOCHS} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} "
                 f"| Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
 
-    # Save metrics to run directory
+    # Save metrics to the run directory
     if is_main:
-        import json
         metrics_path = os.path.join(run_dir, "metrics.json")
+        configuration_path = os.path.join(run_dir, "configuration.json")
         with open(metrics_path, "w") as f:
             json.dump(metrics, f, indent=2)
+        with open(configuration_path, "w") as f:
+            json.dump({
+                "wav2vec2_processor": WAV2VEC2_PROCESSOR,
+                "wav2vec2_encoder": WAV2VEC2_ENCODER,
+                "epochs": EPOCHS,
+                "batch_size": BATCH_SIZE,
+                "learning_rate": LR,
+                "warmup_frac": WARMUP_FRAC,
+                "k": K_PROTOTYPES,
+                "pt_metric": PT_METRIC,
+            }, f, indent=2)
         print(f"Metrics saved to {metrics_path}")
+        print(f"Configuration saved to {configuration_path}")
 
     dist.destroy_process_group()
 

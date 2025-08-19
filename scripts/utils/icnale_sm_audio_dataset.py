@@ -15,7 +15,7 @@ def audio_to_tensor(path, frame_rate=16_000):
         waveform = resampler(waveform)
     return waveform.squeeze().numpy(), frame_rate
 
-class ICNALESMDataset(Dataset):
+class SpeechDataset(Dataset):
     def __init__(self, data_config, cefr_label_df):
         self.cefr_label_df = cefr_label_df
         self.samples = []
