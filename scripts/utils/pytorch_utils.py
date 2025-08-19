@@ -54,7 +54,7 @@ def run_eval(model, loader, criterion, device="cuda", metrics=[]):
             n += preds.size(0)
 
             predictions.extend(preds.cpu().numpy())
-            ids.extend(batch["id"])
+            ids.extend(batch["ids"])
 
     return {
         "loss": total_loss / max(n, 1),
