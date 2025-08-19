@@ -199,7 +199,6 @@ def main():
             criterion=criterion,
             optimizer=optimizer,
             scaler=scaler,
-            scheduler=scheduler,
             device=device
         )
 
@@ -220,6 +219,9 @@ def main():
             predictions = output["predictions"]
             ids = output["ids"]
             torch.cuda.empty_cache()
+
+        if scheduler is not None:
+            scheduler.step()
 
         if is_main:
             metrics.append({

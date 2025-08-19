@@ -5,7 +5,7 @@ import numpy as np
 import torch.distributed as dist
 
 # TODO: Change to run train
-def run_epoch(model, loader, criterion, optimizer=None, scaler=None, scheduler=None, device="cuda"):
+def run_epoch(model, loader, criterion, optimizer=None, scaler=None, device="cuda"):
     is_train = optimizer is not None
     model.train() if is_train else model.eval()
 
@@ -26,8 +26,6 @@ def run_epoch(model, loader, criterion, optimizer=None, scaler=None, scheduler=N
             else:
                 loss.backward()
                 optimizer.step()
-            if scheduler:
-                scheduler.step()
 
         preds = logits.argmax(1)
         total_loss += loss.item() * preds.size(0)
