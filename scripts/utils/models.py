@@ -44,6 +44,7 @@ class PrototypicalClassifier(nn.Module):
             logits = -dists / torch.exp(self.log_tau)
             return logits
 
+# Speech Model
 class SpeechModel(nn.Module):
     def __init__(self, num_classes: int, k: int = 3, embed_dim: int = 256, metric: str = 'sed'):
         super().__init__()
@@ -70,10 +71,10 @@ class SpeechModel(nn.Module):
             return mask
 
 
-    def forward(self, input_values: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
-        out = self.encoder(input_values=input_values, attention_mask=attention_mask)
+    def forward(self, audio_embeddings, **kwargs) -> torch.Tensor:
+        out = self.encoder(input_values=audio_embeddings["input_values"], attention_mask=audio_embeddings["attention_mask"])
         hidden = out.last_hidden_state  # (B, T_feat, H)
-        feat_mask = self._get_feature_level_mask(attention_mask)  # (B, T_feat)
+        feat_mask = self._get_feature_level_mask(audio_embeddings["attention_mask"])  # (B, T_feat)
         pooled = self.pooler(hidden, feat_mask)
         z = self.project(pooled)  # (B, 256)
         logits = self.metric_head(z)
@@ -148,7 +149,7 @@ class MultimodalModel(nn.Module):
                 mask[i, :l] = 1
             return mask
 
-    def forward(self, audio_embeddings, text_embeddings, ids, labels):
+    def forward(self, audio_embeddings, text_embeddings, **kwargs):
         # 1) Make devices/dtypes consistent
         audio_embeddings = self._cast_audio_inputs(audio_embeddings)
         text_embeddings  = self._cast_text_inputs(text_embeddings)

@@ -12,11 +12,10 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from transformers import (
-    Wav2Vec2Processor,
-    BertTokenizer,
     get_cosine_schedule_with_warmup,
 )
 from scripts.utils.models import (
+    SpeechModel,
     MultimodalModel,
 )
 from scripts.utils.icnale_sm_multimodal_dataset import (
@@ -162,15 +161,18 @@ def main():
     )
 
     # Initialize models, criterion, optimizers, and schedulers
-    model = MultimodalModel(
-        wav2vec2_encoder=WAV2VEC2_ENCODER,
-        text_encoder=BERT_MODEL,
-        num_classes=num_classes,
-        k=K_PROTOTYPES,
-        lstm_hidden_dim=LSTM_HID,
-        fusion_proj_dim=FUSION_PROJ_DIM,
-        pt_metric=PT_METRIC,
+    model = SpeechModel(
+        num_classes=num_classes
     )
+    # model = MultimodalModel(
+    #     wav2vec2_encoder=WAV2VEC2_ENCODER,
+    #     text_encoder=BERT_MODEL,
+    #     num_classes=num_classes,
+    #     k=K_PROTOTYPES,
+    #     lstm_hidden_dim=LSTM_HID,
+    #     fusion_proj_dim=FUSION_PROJ_DIM,
+    #     pt_metric=PT_METRIC,
+    # )
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
     scaler = torch.cuda.amp.GradScaler()
@@ -258,9 +260,14 @@ def main():
             json.dump(metrics, f, indent=2)
         with open(configuration_path, "w") as f:
             json.dump({
+                "wav2vec2_processor": WAV2VEC2_PROCESSOR,
+                "bert_tokenizer": BERT_TOKENIZER,
                 "wav2vec2_encoder": WAV2VEC2_ENCODER,
                 "text_encoder": BERT_MODEL,
-                "num_classes": num_classes,
+                "epochs": EPOCHS,
+                "batch_size": BATCH_SIZE,
+                "learning_rate": LR,
+                "warmup_frac": WARMUP_FRAC,
                 "k": K_PROTOTYPES,
                 "lstm_hidden_dim": LSTM_HID,
                 "fusion_proj_dim": FUSION_PROJ_DIM,
