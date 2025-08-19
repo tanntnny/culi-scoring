@@ -16,48 +16,53 @@ def audio_to_tensor(path, frame_rate=16_000):
     return waveform.squeeze().numpy(), frame_rate
 
 class SpeechDataset(Dataset):
-    def __init__(self, data_config, cefr_label_df):
-        self.cefr_label_df = cefr_label_df
+    def __init__(
+            self,
+            data_config,
+            label_config,
+            ):
+        data_config: pd.DataFrame = pd.read_csv(data_config)
+        label_config: pd.DataFrame = pd.read_csv(label_config)
         self.samples = []
         for _, row in data_config.iterrows():
-            path, label = row['path'], row['label']
-            value = cefr_label_df.loc[cefr_label_df["CEFR Level"] == label, "label"].values
+            audio_path = row['audio_path']
+            ids = row['ids']
+            label = row['label']
+            value = label_config.loc[label_config["CEFR Level"] == label, "label"].values
             if len(value) > 0:
-                self.samples.append((path, int(value[0])))
+                self.samples.append((audio_path, ids, int(value[0])))
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        path, label = self.samples[idx]
-        return path, label
+        audio_path, ids, label = self.samples[idx]
+        return audio_path, ids, label
 
 def create_collate_fn(
         audio_processor: Path,
 ):
     wav2vec_processor = Wav2Vec2Processor.from_pretrained(audio_processor)
     def collate_fn(batch):
-        paths, labels = zip(*batch)
-        waveforms = [np.zeros(16000) for _ in paths]
-        for i, path in enumerate(paths):
+        audio_paths, ids, labels = zip(*batch)
+        waveforms = [np.zeros(16000, np.float64) for _ in audio_paths]
+        for idx, audio_path in enumerate(audio_paths):
             try:
-                waveforms[i], _ = audio_to_tensor(path)
+                waveforms[idx], _ = audio_to_tensor(audio_path)
             except Exception as e:
                 pass
 
-        proc_out = wav2vec_processor(
+        audio_embeddings = wav2vec_processor(
             waveforms,
             sampling_rate=16_000,
             return_tensors="pt",
             padding=True,
             return_attention_mask=True,
         )
+        return {
+            'audio_embeddings': audio_embeddings,
+            'ids': ids,
+            'labels': labels
+        }
 
-        if "attention_mask" not in proc_out:
-            input_values = proc_out["input_values"]  # shape: (batch, seq)
-            proc_out["attention_mask"] = torch.ones(
-                input_values.shape, dtype=torch.long
-            )
-        proc_out["labels"] = torch.tensor(labels, dtype=torch.long)
-        proc_out["paths"] = paths
-        return proc_out
+    return collate_fn

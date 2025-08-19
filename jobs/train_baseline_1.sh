@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=train_baseline_1
-#SBATCH --output=logs/train_baseline_%j.out
-#SBATCH --error=logs/train_baseline_%j.err
+#SBATCH --output=logs/train_baseline_1_%j.out
+#SBATCH --error=logs/train_baseline_1_%j.err
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:4
 #SBATCH --nodes=2
@@ -37,9 +37,36 @@ export PYTHONPATH=$PWD
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 # ---- Paths / args ----
-TRAIN_DATA=datasets/SM/ICNALE_SM_Audio/train_config.csv
-VAL_DATA=datasets/SM/ICNALE_SM_Audio/val_config.csv
 SCRIPT=scripts/train_baseline_1.py
 
+TRAIN_DATA=assets/train_fold_0.csv
+VAL_DATA=assets/val_fold_0.csv
+CEFR_LABEL=assets/cefr_label.csv
+BATCH_SIZE=4
+EPOCHS=20
+LR=5e-5
+WARMUP_FRAC=0.1
+LW_ALPHA=1
+K_PROTOTYPES=3
+PT_METRIC=sed
+WAV2VEC2_PROCESSOR=models/wav2vec2-processor
+WAV2VEC2_ENCODER=models/wav2vec2-model
+
 echo "Launching with srun..."
-srun python "$SCRIPT" --train-data "$TRAIN_DATA" --val-data "$VAL_DATA"
+srun python "$SCRIPT" \
+    --train-data "$TRAIN_DATA" \
+    --val-data "$VAL_DATA" \
+    --cefr-label "$CEFR_LABEL" \
+    --batch-size "$BATCH_SIZE" \
+    --epochs "$EPOCHS" \
+    --lr "$LR" \
+    --warmup-frac "$WARMUP_FRAC" \
+    --lw-alpha "$LW_ALPHA" \
+    --k-prototypes "$K_PROTOTYPES" \
+    --lstm-hid "$LSTM_HID" \
+    --fusion-proj-dim "$FUSION_PROJ_DIM" \
+    --pt-metric "$PT_METRIC" \
+    --wav2vec2-processor "$WAV2VEC2_PROCESSOR" \
+    --wav2vec2-encoder "$WAV2VEC2_ENCODER" \
+    --bert-tokenizer "$BERT_TOKENIZER" \
+    --bert-model "$BERT_MODEL"

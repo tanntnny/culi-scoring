@@ -17,12 +17,13 @@ from transformers import (
 from scripts.utils.models import (
     SpeechModel,
 )
-from scripts.utils.icnale_sm_multimodal_dataset import (
-    MultimodalSMDataset,
+from scripts.utils.icnale_speech_dataset import (
+    SpeechDataset,
     create_collate_fn,
 )
 from scripts.utils.pytorch_utils import (
     run_epoch,
+    run_eval,
     setup_ddp_from_slurm,
     save_model,
 )
@@ -109,11 +110,12 @@ def main():
 
     # Prepare Datasets, Dataloaders, Datasamplers
     cefr_label_df = pd.read_csv(CEFR_LABEL)
+    val_df = pd.read_csv(VAL_DATA)
     num_classes = len(cefr_label_df)
 
-    collate_fn = create_collate_fn(WAV2VEC2_PROCESSOR, BERT_TOKENIZER)
-    train_dataset = MultimodalSMDataset(TRAIN_DATA, CEFR_LABEL)
-    val_dataset = MultimodalSMDataset(VAL_DATA, CEFR_LABEL)
+    collate_fn = create_collate_fn(WAV2VEC2_PROCESSOR)
+    train_dataset = SpeechDataset(TRAIN_DATA, CEFR_LABEL)
+    val_dataset = SpeechDataset(VAL_DATA, CEFR_LABEL)
     train_sampler = DistributedSampler(
         train_dataset,
         shuffle=True,
@@ -203,13 +205,20 @@ def main():
 
         val_loss = 0.0
         val_acc = 0.0
+        predictions = None
+        ids = None
+
         with torch.no_grad():
-            val_loss, val_acc = run_epoch(
+            output = run_eval(
                 model=model,
                 loader=val_dataloader,
                 criterion=criterion,
                 device=device
             )
+            val_loss = output["loss"]
+            val_acc = output["accuracy"]
+            predictions = output["predictions"]
+            ids = output["ids"]
             torch.cuda.empty_cache()
 
         if is_main:
@@ -217,8 +226,8 @@ def main():
                 "epoch": epoch+1,
                 "train_loss": train_loss,
                 "train_acc": train_acc,
-                "val_loss": val_loss,
-                "val_acc": val_acc
+                "val_loss": output["loss"],
+                "val_acc": output["accuracy"],
             })
 
             if val_acc > best_val_acc:

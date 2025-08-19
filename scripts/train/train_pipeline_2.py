@@ -18,7 +18,7 @@ from scripts.utils.models import (
     SpeechModel,
     MultimodalModel,
 )
-from scripts.utils.icnale_sm_multimodal_dataset import (
+from scripts.utils.icnale_multimodal_dataset import (
     MultimodalSMDataset,
     create_collate_fn,
 )
@@ -161,18 +161,15 @@ def main():
     )
 
     # Initialize models, criterion, optimizers, and schedulers
-    model = SpeechModel(
-        num_classes=num_classes
+    model = MultimodalModel(
+        wav2vec2_encoder=WAV2VEC2_ENCODER,
+        text_encoder=BERT_MODEL,
+        num_classes=num_classes,
+        k=K_PROTOTYPES,
+        lstm_hidden_dim=LSTM_HID,
+        fusion_proj_dim=FUSION_PROJ_DIM,
+        pt_metric=PT_METRIC,
     )
-    # model = MultimodalModel(
-    #     wav2vec2_encoder=WAV2VEC2_ENCODER,
-    #     text_encoder=BERT_MODEL,
-    #     num_classes=num_classes,
-    #     k=K_PROTOTYPES,
-    #     lstm_hidden_dim=LSTM_HID,
-    #     fusion_proj_dim=FUSION_PROJ_DIM,
-    #     pt_metric=PT_METRIC,
-    # )
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
     scaler = torch.cuda.amp.GradScaler()

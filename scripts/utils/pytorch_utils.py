@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import torch.distributed as dist
 
+# TODO: Change to run train
 def run_epoch(model, loader, criterion, optimizer=None, scaler=None, scheduler=None, device="cuda"):
     is_train = optimizer is not None
     model.train() if is_train else model.eval()
@@ -33,6 +34,34 @@ def run_epoch(model, loader, criterion, optimizer=None, scaler=None, scheduler=N
         correct += (preds == batch["labels"]).sum().item()
         n += preds.size(0)
     return total_loss / max(n, 1), correct / max(n, 1)
+
+def run_eval(model, loader, criterion, device="cuda", metrics=[]):
+    model.eval()
+    total_loss, correct, n = 0.0, 0, 0
+    predictions = []
+    ids = []
+    with torch.no_grad():
+        for batch in loader:
+            for key, value in batch.items():
+                if torch.is_tensor(value): batch[key] = value.to(device, non_blocking=True)
+
+            logits = model(**batch)
+            loss = criterion(logits, batch["labels"])
+
+            preds = logits.argmax(1)
+            total_loss += loss.item() * preds.size(0)
+            correct += (preds == batch["labels"]).sum().item()
+            n += preds.size(0)
+
+            predictions.extend(preds.cpu().numpy())
+            ids.extend(batch["id"].cpu().numpy())
+
+    return {
+        "loss": total_loss / max(n, 1),
+        "accuracy": correct / max(n, 1),
+        "predictions": predictions,
+        "ids": ids,
+    }
 
 def save_model(model, epoch, eval_acc, run_dir):
     save_path = os.path.join(run_dir, f"model_epoch{epoch}_acc{eval_acc:.4f}.pt")
