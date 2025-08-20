@@ -140,6 +140,9 @@ def main():
         train_df.to_csv(Path(OUTPUT_PATH) / f"train_fold_{i}.csv", index=False)
         val_df.to_csv(Path(OUTPUT_PATH) / f"val_fold_{i}.csv", index=False)
         print(f"Fold {i}: train={len(train_df)}, val={len(val_df)}")
+        print(f"Fold {i}: train label distribution:\n{train_df['label'].value_counts()}")
+        print(f"Fold {i}: val label distribution:\n{val_df['label'].value_counts()}")
+        print(f"--------------------------------------------------")
 
     print(f"Data split completed. Files saved to {OUTPUT_PATH}")
 
