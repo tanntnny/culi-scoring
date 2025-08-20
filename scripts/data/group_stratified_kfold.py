@@ -63,7 +63,7 @@ def create_dataframe_from_files(
             data_dict[id] = {
                 "audio_path": None,
                 "text_path": None,
-                "label": label_from_icnale(f)
+                "label": label_method(f)
             }
         name, ext = os.path.splitext(f)
         if ext in [".mp3", ".wav"]:

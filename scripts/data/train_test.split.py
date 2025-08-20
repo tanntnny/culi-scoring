@@ -63,7 +63,7 @@ def create_dataframe_from_files(
             data_dict[id] = {
                 "audio_path": None,
                 "text_path": None,
-                "label": label_from_icnale(f)
+                "label": label_method(f)
             }
         name, ext = os.path.splitext(f)
         if ext in [".mp3", ".wav"]:
@@ -122,11 +122,14 @@ def main():
         data_df,
         train_size=TRAIN_RATIO,
         shuffle=True,
-        random_state=42
+        random_state=42,
+        stratify=data_df["label"],
     )
 
     train_df.to_csv(os.path.join(OUTPUT_PATH, "train_common.csv"), index=False)
     val_df.to_csv(os.path.join(OUTPUT_PATH, "val_common.csv"), index=False)
+    print(f"Train label distribution:\n{train_df['label'].value_counts()}")
+    print(f"Validation label distribution:\n{val_df['label'].value_counts()}")
     print(f"Data split completed. Files saved to {OUTPUT_PATH}")
 
 if __name__ == "__main__":
