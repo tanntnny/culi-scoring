@@ -1,10 +1,19 @@
-import torch
-import torchaudio
+from pathlib import Path
+from typing import Union, Tuple, List, Dict, Any, Optional
+
 import pandas as pd
 import numpy as np
-from torch.utils.data import Dataset
-from transformers import Wav2Vec2Processor
-from pathlib import Path
+
+import torch
+import torchaudio
+
+from torch.utils.data import (
+    Dataset
+)
+
+from transformers import (
+    Wav2Vec2Processor
+)
 
 def audio_to_tensor(path, frame_rate=16_000):
     waveform, sample_rate = torchaudio.load(path)
