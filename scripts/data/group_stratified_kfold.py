@@ -22,8 +22,9 @@ def walk_folder(folder_path: Path, only_files: bool = True):
 
 def check_from_icnale(file_path: str):
     basename = os.path.basename(file_path)
+    label = label_from_icnale(file_path)
     splits = basename.split("_")
-    return len(splits) == 6 and (splits[-1][1] != "(")
+    return len(splits) == 6 and (splits[-1][1] != "(") and label[:2] != "XX"
 
 def group_by_id(file_path: str):
     basename = os.path.basename(file_path)
