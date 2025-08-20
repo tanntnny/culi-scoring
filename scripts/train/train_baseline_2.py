@@ -14,16 +14,16 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import (
     get_cosine_schedule_with_warmup,
 )
-from scripts.models.models import (
-    SpeechModel,
-    MultimodalModel,
+from scripts.models.text_models import (
+    TextModel,
 )
-from scripts.data.multimodal_dataset import (
-    MultimodalSMDataset,
+from scripts.data.text_dataset import (
+    TextDataset,
     create_collate_fn,
 )
 from scripts.utils.pytorch_utils import (
     run_epoch,
+    run_eval,
     setup_ddp_from_slurm,
     save_model,
 )
@@ -62,13 +62,9 @@ def main():
     parser.add_argument("--warmup-frac", type=float, default=0.1, help="Fraction of total steps for learning rate warmup.")
     parser.add_argument("--lw-alpha", type=float, default=1, help="Loss re-weighting alpha parameter.")
 
-    parser.add_argument("--wav2vec2-processor", type=str, default="models/wav2vec2-processor", help="Path to the Wav2Vec2 processor directory.")
-    parser.add_argument("--wav2vec2-encoder", type=str, default="models/wav2vec2-model", help="Path to the Wav2Vec2 encoder/model directory.")
-    parser.add_argument("--bert-tokenizer", type=str, default="models/bert-tokenizer", help="Path to the BERT tokenizer directory.")
-    parser.add_argument("--bert-model", type=str, default="models/bert-model", help="Path to the BERT model directory.")
+    parser.add_argument("--text-processor", type=str, default="models/bert-tokenizer", help="Path to the BERT tokenizer directory.")
+    parser.add_argument("--text-encoder", type=str, default="models/bert-model", help="Path to the BERT model directory.")
     parser.add_argument("--k-prototypes", type=int, default=3, help="Number of prototypes for the Prototypical Network.")
-    parser.add_argument("--lstm-hid", type=int, default=256, help="Hidden size for the LSTM.")
-    parser.add_argument("--fusion-proj-dim", type=int, default=256, help="Projection dimension for the fusion layer.")
     parser.add_argument("--pt-metric", type=str, default="sed", help="Metric for the Prototypical Network (e.g., 'sed' or 'cos').")
     args = parser.parse_args()
 
@@ -83,13 +79,9 @@ def main():
     LR = args.lr
     WARMUP_FRAC = args.warmup_frac
     LW_ALPHA = args.lw_alpha
-    LSTM_HID = args.lstm_hid
-    FUSION_PROJ_DIM = args.fusion_proj_dim
     PT_METRIC = args.pt_metric
-    WAV2VEC2_PROCESSOR = args.wav2vec2_processor
-    WAV2VEC2_ENCODER = args.wav2vec2_encoder
-    BERT_TOKENIZER = args.bert_tokenizer
-    BERT_MODEL = args.bert_model
+    TEXT_PROCESSOR = args.text_processor
+    TEXT_ENCODER = args.text_encoder
 
     # Setup DDP
 
@@ -109,24 +101,21 @@ def main():
         print(f"Learning rate: {LR}")
         print(f"Warmup fraction: {WARMUP_FRAC}")
         print(f"Label weighting alpha: {LW_ALPHA}")
-        print(f"LSTM hidden dim: {LSTM_HID}")
-        print(f"Fusion projection dim: {FUSION_PROJ_DIM}")
         print(f"PT metric: {PT_METRIC}")
-        print(f"Wav2Vec2 processor: {WAV2VEC2_PROCESSOR}")
-        print(f"Wav2Vec2 encoder: {WAV2VEC2_ENCODER}")
-        print(f"BERT tokenizer: {BERT_TOKENIZER}")
-        print(f"BERT model: {BERT_MODEL}")
-        
+        print(f"Text processor: {TEXT_PROCESSOR}")
+        print(f"Text encoder: {TEXT_ENCODER}")
+
         run_dir = get_next_run_dir()
         print(f"Saving all results in {run_dir}")
 
     # Prepare Datasets, Dataloaders, Datasamplers
     cefr_label_df = pd.read_csv(CEFR_LABEL)
+    val_df = pd.read_csv(VAL_DATA)
     num_classes = len(cefr_label_df)
 
-    collate_fn = create_collate_fn(WAV2VEC2_PROCESSOR, BERT_TOKENIZER)
-    train_dataset = MultimodalSMDataset(TRAIN_DATA, CEFR_LABEL)
-    val_dataset = MultimodalSMDataset(VAL_DATA, CEFR_LABEL)
+    collate_fn = create_collate_fn(TEXT_PROCESSOR)
+    train_dataset = TextDataset(TRAIN_DATA, CEFR_LABEL)
+    val_dataset = TextDataset(VAL_DATA, CEFR_LABEL)
     train_sampler = DistributedSampler(
         train_dataset,
         shuffle=True,
@@ -161,14 +150,9 @@ def main():
     )
 
     # Initialize models, criterion, optimizers, and schedulers
-    model = MultimodalModel(
-        wav2vec2_encoder=WAV2VEC2_ENCODER,
-        text_encoder=BERT_MODEL,
+    model = TextModel(
         num_classes=num_classes,
-        k=K_PROTOTYPES,
-        lstm_hidden_dim=LSTM_HID,
-        fusion_proj_dim=FUSION_PROJ_DIM,
-        pt_metric=PT_METRIC,
+        bert_model=TEXT_ENCODER,
     )
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
@@ -216,28 +200,37 @@ def main():
             criterion=criterion,
             optimizer=optimizer,
             scaler=scaler,
-            scheduler=scheduler,
             device=device
         )
 
         val_loss = 0.0
         val_acc = 0.0
+        predictions = None
+        ids = None
+
         with torch.no_grad():
-            val_loss, val_acc = run_epoch(
+            output = run_eval(
                 model=model,
                 loader=val_dataloader,
                 criterion=criterion,
                 device=device
             )
+            val_loss = output["loss"]
+            val_acc = output["accuracy"]
+            predictions = output["predictions"]
+            ids = output["ids"]
             torch.cuda.empty_cache()
+
+        if scheduler is not None:
+            scheduler.step()
 
         if is_main:
             metrics.append({
                 "epoch": epoch+1,
                 "train_loss": train_loss,
                 "train_acc": train_acc,
-                "val_loss": val_loss,
-                "val_acc": val_acc
+                "val_loss": output["loss"],
+                "val_acc": output["accuracy"],
             })
 
             if val_acc > best_val_acc:
@@ -257,17 +250,13 @@ def main():
             json.dump(metrics, f, indent=2)
         with open(configuration_path, "w") as f:
             json.dump({
-                "wav2vec2_processor": WAV2VEC2_PROCESSOR,
-                "bert_tokenizer": BERT_TOKENIZER,
-                "wav2vec2_encoder": WAV2VEC2_ENCODER,
-                "text_encoder": BERT_MODEL,
+                "text_processor": TEXT_PROCESSOR,
+                "text_encoder": TEXT_ENCODER,
                 "epochs": EPOCHS,
                 "batch_size": BATCH_SIZE,
                 "learning_rate": LR,
                 "warmup_frac": WARMUP_FRAC,
                 "k": K_PROTOTYPES,
-                "lstm_hidden_dim": LSTM_HID,
-                "fusion_proj_dim": FUSION_PROJ_DIM,
                 "pt_metric": PT_METRIC,
             }, f, indent=2)
         print(f"Metrics saved to {metrics_path}")

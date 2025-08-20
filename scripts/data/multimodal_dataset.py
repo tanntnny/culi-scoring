@@ -66,7 +66,7 @@ def create_collate_fn(
                 pass
         for idx, text in enumerate(text_paths):
             with open(text,'r', encoding='utf-8') as f:
-                texts[idx] = f.read()
+                texts[idx] = f.read().strip()
 
         # Create embedding
         audio_embeddings = audio_processor(

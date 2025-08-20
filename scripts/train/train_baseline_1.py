@@ -14,10 +14,10 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import (
     get_cosine_schedule_with_warmup,
 )
-from scripts.utils.models import (
+from scripts.models.models import (
     SpeechModel,
 )
-from scripts.utils.icnale_speech_dataset import (
+from scripts.data.speech_dataset import (
     SpeechDataset,
     create_collate_fn,
 )
