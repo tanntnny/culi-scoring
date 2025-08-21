@@ -15,7 +15,6 @@ from transformers import (
     get_cosine_schedule_with_warmup,
 )
 from scripts.models.models import (
-    SpeechModel,
     MultimodalModel,
 )
 from scripts.data.multimodal_dataset import (
@@ -24,6 +23,7 @@ from scripts.data.multimodal_dataset import (
 )
 from scripts.utils.pytorch_utils import (
     run_epoch,
+    run_eval,
     setup_ddp_from_slurm,
     save_model,
 )
@@ -216,20 +216,29 @@ def main():
             criterion=criterion,
             optimizer=optimizer,
             scaler=scaler,
-            scheduler=scheduler,
             device=device
         )
 
         val_loss = 0.0
         val_acc = 0.0
+        predictions = None
+        ids = None
+
         with torch.no_grad():
-            val_loss, val_acc = run_epoch(
+            output = run_eval(
                 model=model,
                 loader=val_dataloader,
                 criterion=criterion,
                 device=device
             )
+            val_loss = output["loss"]
+            val_acc = output["accuracy"]
+            predictions = output["predictions"]
+            ids = output["ids"]
             torch.cuda.empty_cache()
+
+        if scheduler is not None:
+            scheduler.step()
 
         if is_main:
             metrics.append({
@@ -237,7 +246,7 @@ def main():
                 "train_loss": train_loss,
                 "train_acc": train_acc,
                 "val_loss": val_loss,
-                "val_acc": val_acc
+                "val_acc": val_acc,
             })
 
             if val_acc > best_val_acc:

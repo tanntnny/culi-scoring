@@ -37,7 +37,7 @@ export PYTHONPATH=$PWD
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 # ---- Paths / args ----
-SCRIPT=scripts/train_pipeline_2.py
+SCRIPT=scripts/train/train_pipeline_2.py
 
 TRAIN_DATA=assets/train_fold_0.csv
 VAL_DATA=assets/val_fold_0.csv
