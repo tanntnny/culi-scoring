@@ -239,8 +239,8 @@ class MultimodalModel(nn.Module):
         combined_features = torch.cat((audio_pooled, text_pooled), dim=1)  # (B, 4 * lstm_hidden_dim)
         fused_features = self.fusion_projection(combined_features)
         
-        logits = self.mlp_head(fused_features.float())
+        # logits = self.mlp_head(fused_features.float())
 
         # 5) CLASSIFIER (run head in fp32 for stable distances)
-        # logits = self.metric_head(fused_features.float())
+        logits = self.metric_head(fused_features.float())
         return logits
