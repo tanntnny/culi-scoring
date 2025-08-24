@@ -25,7 +25,7 @@ class PositionalEncoder(nn.Module):
             ) -> torch.Tensor:
         # x shape : (Batch, Sequence, Feature)
         seq = x.size(1)
-        return x + self.positional_encoding[:, :seq]
+        return x + self.pe[:, :seq]
 
 # ---------------- Attention Pooler ----------------
 class AttentionPooler(nn.Module):
