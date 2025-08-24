@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import json
 
 from scripts.utils.icnale_sm_audio_dataset import ICNALE_SM_Dataset, collate_fn
-from scripts.models.models import SpeechModel
+from scripts.models.baseline_multimodal_models import SpeechModel
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate model and export predictions.")

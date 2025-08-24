@@ -14,8 +14,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import (
     get_cosine_schedule_with_warmup,
 )
-from scripts.models.models import (
-    MultimodalModel,
+from scripts.models.baseline_multimodal_models import (
+    IndividualModalModel,
 )
 from scripts.data.multimodal_dataset import (
     MultimodalSMDataset,
@@ -161,7 +161,7 @@ def main():
     )
 
     # Initialize models, criterion, optimizers, and schedulers
-    model = MultimodalModel(
+    model = IndividualModalModel(
         wav2vec2_encoder=WAV2VEC2_ENCODER,
         text_encoder=BERT_MODEL,
         num_classes=num_classes,

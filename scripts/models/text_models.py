@@ -4,7 +4,7 @@ from typing import Union
 import torch
 import torch.nn as nn
 
-from scripts.models.models import (
+from scripts.models.baseline_multimodal_models import (
     MeanPooler,
     PrototypicalClassifier,
 )

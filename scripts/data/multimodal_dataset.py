@@ -69,14 +69,14 @@ def create_collate_fn(
                 texts[idx] = f.read().strip()
 
         # Create embedding
-        audio_embeddings = audio_processor(
+        audio_tokens = audio_processor(
             waveforms,
             sampling_rate=16000,
             return_tensors="pt",
             padding=True,
             return_attention_mask=True
         )
-        text_embeddings = text_tokenizer(
+        text_tokens = text_tokenizer(
             list(texts),
             truncation=True,
             padding=True,
@@ -84,8 +84,8 @@ def create_collate_fn(
         )
         
         return {
-            'audio_embeddings': audio_embeddings,
-            'text_embeddings': text_embeddings,
+            'audio_tokens': audio_tokens,
+            'text_tokens': text_tokens,
             'ids': ids,
             'labels': labels
         }

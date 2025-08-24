@@ -1,8 +1,16 @@
+from dataclasses import dataclass
+from typing import Optional, Tuple, Union
+
 import math
 from pathlib import Path
 
 import torch
 import torch.nn as nn
+
+from scripts.models.transformer_essentials import (
+    PositionalEncoder,
+    AttentionPooler,
+)
 from transformers import Wav2Vec2Model, BertModel
 
 class MeanPooler(nn.Module):
@@ -92,7 +100,7 @@ class SpeechModel(nn.Module):
         return logits
 
 # Multimodal Model
-class MultimodalModel(nn.Module):
+class IndividualModalModel(nn.Module):
     def __init__(self,
                 wav2vec2_encoder: Path,
                 text_encoder: Path,
@@ -236,3 +244,122 @@ class MultimodalModel(nn.Module):
         # 5) CLASSIFIER (run head in fp32 for stable distances)
         logits = self.metric_head(fused_features.float())
         return logits
+
+# ---------------- Cross-Modal Block ----------------
+class CrossModalBlock(nn.Module):
+    def __init__(
+            self,
+            dim_q: int,
+            dim_kv: int,
+            n_heads: int = 8,
+            dropout: float = 0.1,
+    ):
+        super().__init__()
+        assert dim_q % n_heads == 0, "dim_q must be divisible by n_heads"
+
+        self.cross_attn = nn.MultiheadAttention(
+            embed_dim=dim_q,
+            kdim=dim_kv,
+            vdim=dim_kv,
+            num_heads=n_heads,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.self_attn = nn.MultiheadAttention(
+            embed_dim=dim_q,
+            num_heads=1,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.ff = nn.Sequential(
+            nn.Linear(dim_q, dim_q * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_q * 4, dim_q)
+        )
+        self.norm_q_1 = nn.LayerNorm(dim_q)
+        self.norm_q_2 = nn.LayerNorm(dim_q)
+        self.norm_q_3 = nn.LayerNorm(dim_q)
+        self.norm_kv = nn.LayerNorm(dim_kv)
+        self.dropout = nn.Dropout(dropout)
+    
+    def forward(
+            self,
+            q: torch.Tensor,
+            kv: torch.Tensor,
+    ):
+        # q shape : (Batch, Sequence_q, Feature_q)
+        # kv shape : (Batch, Sequence_kv, Feature_kv)
+        q_norm = self.norm_q_1(q)
+        kv_norm = self.norm_kv(kv)
+        x, _ = self.cross_attn(q_norm, kv_norm, kv_norm)
+        q = q + self.dropout(x)
+        
+        q_norm = self.norm_q_2(q)
+        q = q + self.dropout(self.ff(q_norm))
+
+        q_norm = self.norm_q_3(q)
+        x, _ = self.self_attn(q_norm, q_norm, q_norm)
+        q = q + self.dropout(x)
+
+        return q
+
+# ---------------- Linguistic Feature Block ----------------
+# TODO
+
+# ---------------- Cross-Modal Scorer ----------------
+class CrossModalScorer(nn.Module):
+    def __init__(
+            self,
+            num_classes: int,
+            audio_encoder: Union[str, Path],
+            text_encoder: Union[str, Path],
+            lstm_hidden_dim: int = 512,
+            dropout: float = 0.0,
+    ):
+        super().__init__()
+        
+        self.audio_encoder = Wav2Vec2Model.from_pretrained(audio_encoder)
+        audio_hid_dim = self.audio_encoder.config.hidden_size
+        self.audio_positional_encoder = PositionalEncoder(dim_embed=audio_hid_dim, max_len=5_000)
+
+        self.text_encoder = BertModel.from_pretrained(text_encoder)
+        text_hid_dim = self.text_encoder.config.hidden_size
+        self.text_positional_encoder = PositionalEncoder(dim_embed=text_hid_dim, max_len=5_000)
+
+        self.audio_text_cross_attn = CrossModalBlock(dim_q=audio_hid_dim, dim_kv=text_hid_dim)
+        self.text_audio_cross_attn = CrossModalBlock(dim_q=text_hid_dim, dim_kv=audio_hid_dim)
+
+        self.bilstm = nn.LSTM(audio_hid_dim + text_hid_dim, lstm_hidden_dim, batch_first=True, bidirectional=True)
+        self.self_attn = nn.MultiheadAttention(embed_dim=lstm_hidden_dim * 2, num_heads=1, dropout=0.1, batch_first=True)
+        self.attn_pooler = AttentionPooler(lstm_hidden_dim * 2)
+        self.fc = nn.Sequential(
+            nn.Linear(lstm_hidden_dim * 2, lstm_hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(lstm_hidden_dim, num_classes)
+        )
+
+    def forward(
+            self,
+            audio_tokens: torch.Tensor,
+            text_tokens: torch.Tensor,
+    ):
+        audio_embedding = self.audio_encoder(audio_tokens).last_hidden_state
+        audio_pe = self.audio_positional_encoder(audio_embedding)
+        audio_embedding = audio_embedding + audio_pe
+
+        text_embedding = self.text_encoder(**text_tokens).last_hidden_state
+        text_pe = self.text_positional_encoder(text_embedding)
+        text_embedding = text_embedding + text_pe
+
+        audio_embedding = self.audio_text_cross_attn(audio_embedding, text_embedding)
+        text_embedding = self.text_audio_cross_attn(text_embedding, audio_embedding)
+
+        concat = torch.cat((audio_embedding, text_embedding), dim=-1)
+        lstm_out, _ = self.bilstm(concat)
+        self_attn_out, _ = self.self_attn(lstm_out, lstm_out, lstm_out)
+        pooled = self.attn_pooler(self_attn_out)
+
+        z = self.fc(pooled)
+        return z

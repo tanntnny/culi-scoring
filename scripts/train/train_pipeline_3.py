@@ -15,10 +15,10 @@ from transformers import (
     get_cosine_schedule_with_warmup,
 )
 from scripts.models.baseline_multimodal_models import (
-    SpeechModel,
+    CrossModalScorer,
 )
-from scripts.data.speech_dataset import (
-    SpeechDataset,
+from scripts.data.multimodal_dataset import (
+    MultimodalSMDataset,
     create_collate_fn,
 )
 from scripts.utils.pytorch_utils import (
@@ -64,8 +64,9 @@ def main():
 
     parser.add_argument("--wav2vec2-processor", type=str, default="models/wav2vec2-processor", help="Path to the Wav2Vec2 processor directory.")
     parser.add_argument("--wav2vec2-encoder", type=str, default="models/wav2vec2-model", help="Path to the Wav2Vec2 encoder/model directory.")
-    parser.add_argument("--k-prototypes", type=int, default=3, help="Number of prototypes for the Prototypical Network.")
-    parser.add_argument("--pt-metric", type=str, default="sed", help="Metric for the Prototypical Network (e.g., 'sed' or 'cos').")
+    parser.add_argument("--bert-tokenizer", type=str, default="models/bert-tokenizer", help="Path to the BERT tokenizer directory.")
+    parser.add_argument("--bert-model", type=str, default="models/bert-model", help="Path to the BERT model directory.")
+    parser.add_argument("--lstm-hid", type=int, default=512, help="Hidden size for the LSTM.")
     args = parser.parse_args()
 
     # Arguments & Hyperparameters
@@ -79,9 +80,11 @@ def main():
     LR = args.lr
     WARMUP_FRAC = args.warmup_frac
     LW_ALPHA = args.lw_alpha
-    PT_METRIC = args.pt_metric
+    LSTM_HID = args.lstm_hid
     WAV2VEC2_PROCESSOR = args.wav2vec2_processor
     WAV2VEC2_ENCODER = args.wav2vec2_encoder
+    BERT_TOKENIZER = args.bert_tokenizer
+    BERT_MODEL = args.bert_model
 
     # Setup DDP
 
@@ -92,6 +95,7 @@ def main():
 
     if is_main:
         print(f"------------------- Arguments -------------------")
+        print(f"Script: train_pipeline_3.py")
         print(f"CPUs per task: {CPUS_PER_TASK}")
         print(f"Training data: {TRAIN_DATA}")
         print(f"Validation data: {VAL_DATA}")
@@ -101,21 +105,22 @@ def main():
         print(f"Learning rate: {LR}")
         print(f"Warmup fraction: {WARMUP_FRAC}")
         print(f"Label weighting alpha: {LW_ALPHA}")
-        print(f"PT metric: {PT_METRIC}")
+        print(f"LSTM hidden dim: {LSTM_HID}")
         print(f"Wav2Vec2 processor: {WAV2VEC2_PROCESSOR}")
         print(f"Wav2Vec2 encoder: {WAV2VEC2_ENCODER}")
+        print(f"BERT tokenizer: {BERT_TOKENIZER}")
+        print(f"BERT model: {BERT_MODEL}")
         
         run_dir = get_next_run_dir()
         print(f"Saving all results in {run_dir}")
 
     # Prepare Datasets, Dataloaders, Datasamplers
     cefr_label_df = pd.read_csv(CEFR_LABEL)
-    val_df = pd.read_csv(VAL_DATA)
     num_classes = len(cefr_label_df)
 
-    collate_fn = create_collate_fn(WAV2VEC2_PROCESSOR)
-    train_dataset = SpeechDataset(TRAIN_DATA, CEFR_LABEL)
-    val_dataset = SpeechDataset(VAL_DATA, CEFR_LABEL)
+    collate_fn = create_collate_fn(WAV2VEC2_PROCESSOR, BERT_TOKENIZER)
+    train_dataset = MultimodalSMDataset(TRAIN_DATA, CEFR_LABEL)
+    val_dataset = MultimodalSMDataset(VAL_DATA, CEFR_LABEL)
     train_sampler = DistributedSampler(
         train_dataset,
         shuffle=True,
@@ -150,8 +155,11 @@ def main():
     )
 
     # Initialize models, criterion, optimizers, and schedulers
-    model = SpeechModel(
-        num_classes=num_classes
+    model = CrossModalScorer(
+        num_classes=num_classes,
+        wav2vec2_encoder=WAV2VEC2_ENCODER,
+        text_encoder=BERT_MODEL,
+        lstm_hidden_dim=LSTM_HID,
     )
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
@@ -228,8 +236,8 @@ def main():
                 "epoch": epoch+1,
                 "train_loss": train_loss,
                 "train_acc": train_acc,
-                "val_loss": output["loss"],
-                "val_acc": output["accuracy"],
+                "val_loss": val_loss,
+                "val_acc": val_acc,
             })
 
             if val_acc > best_val_acc:
@@ -249,14 +257,20 @@ def main():
             json.dump(metrics, f, indent=2)
         with open(configuration_path, "w") as f:
             json.dump({
+                "script": "train_pipeline_3.py",
+                "train_data": TRAIN_DATA,
+                "val_data": VAL_DATA,
+                "cefr_label": CEFR_LABEL,
+                "cpus_per_task": CPUS_PER_TASK,
                 "wav2vec2_processor": WAV2VEC2_PROCESSOR,
+                "bert_tokenizer": BERT_TOKENIZER,
                 "wav2vec2_encoder": WAV2VEC2_ENCODER,
+                "text_encoder": BERT_MODEL,
                 "epochs": EPOCHS,
                 "batch_size": BATCH_SIZE,
                 "learning_rate": LR,
                 "warmup_frac": WARMUP_FRAC,
-                "k": K_PROTOTYPES,
-                "pt_metric": PT_METRIC,
+                "lstm_hidden_dim": LSTM_HID,
             }, f, indent=2)
         print(f"Metrics saved to {metrics_path}")
         print(f"Configuration saved to {configuration_path}")
