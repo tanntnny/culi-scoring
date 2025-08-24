@@ -220,7 +220,7 @@ def main():
 
             preds = outputs.argmax(1)
             train_loss += loss.item() * preds.size(0)
-            correct += (preds == y["labels"]).sum().item()
+            train_acc += (preds == y["labels"]).sum().item()
             n += preds.size(0)
         train_loss = train_loss / max(n, 1)
         train_acc = train_acc / max(n, 1)
