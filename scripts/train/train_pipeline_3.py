@@ -74,7 +74,6 @@ def main():
     TRAIN_DATA = args.train_data
     VAL_DATA = args.val_data
     CEFR_LABEL = args.cefr_label
-    K_PROTOTYPES = args.k_prototypes
     BATCH_SIZE = args.batch_size
     EPOCHS = args.epochs
     LR = args.lr
@@ -201,39 +200,57 @@ def main():
         train_sampler.set_epoch(epoch)
         val_sampler.set_epoch(epoch)
 
-        train_loss, train_acc = run_epoch(
-            model=model,
-            loader=train_dataloader,
-            criterion=criterion,
-            optimizer=optimizer,
-            scaler=scaler,
-            device=device
-        )
+        train_loss, train_acc, n = 0.0, 0, 0
+        
+        model.train()
+        for _, batch in enumerate(train_dataloader):
+            x, y, ids = batch
+            for key, value in x.items():
+                if torch.is_tensor(value): x[key] = value.to(device, non_blocking=True)
+            for key, value in y.items():
+                if torch.is_tensor(value): y[key] = value.to(device, non_blocking=True)
+            
+            with torch.cuda.amp.autocast(enabled=scaler is not None):
+                outputs = model(**x)
+                loss = criterion(outputs, y["labels"])
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
 
-        val_loss = 0.0
-        val_acc = 0.0
-        predictions = None
-        ids = None
+            preds = outputs.argmax(1)
+            total_loss += loss.item() * preds.size(0)
+            correct += (preds == y["labels"]).sum().item()
+            n += preds.size(0)
+        train_loss = total_loss / max(n, 1)
+        train_acc = train_acc / max(n, 1)
 
+        val_loss, val_acc, n = 0.0, 0.0, 0
+        model.eval()
         with torch.no_grad():
-            output = run_eval(
-                model=model,
-                loader=val_dataloader,
-                criterion=criterion,
-                device=device
-            )
-            val_loss = output["loss"]
-            val_acc = output["accuracy"]
-            predictions = output["predictions"]
-            ids = output["ids"]
-            torch.cuda.empty_cache()
+            for _, batch in enumerate(val_dataloader):
+                x, y, ids = batch
+                for key, value in x.items():
+                    if torch.is_tensor(value): x[key] = value.to(device, non_blocking=True)
+                for key, value in y.items():
+                    if torch.is_tensor(value): y[key] = value.to(device, non_blocking=True)
 
-        if scheduler is not None:
-            scheduler.step()
+                outputs = model(**x)
+                loss = criterion(outputs, y["labels"])
+                val_loss += loss.item() * outputs.size(0)
+                preds = outputs.argmax(1)
+                val_acc += (preds == y["labels"]).sum().item()
+                n += preds.size(0)
+            val_loss = val_loss / max(n, 1)
+            val_acc = val_acc / max(n, 1)
+
+        torch.cuda.empty_cache()
+
+        scheduler.step()
 
         if is_main:
             metrics.append({
-                "epoch": epoch+1,
+                "epoch": epoch + 1,
                 "train_loss": train_loss,
                 "train_acc": train_acc,
                 "val_loss": val_loss,
@@ -242,7 +259,7 @@ def main():
 
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
-                save_model(model, epoch+1, val_acc, run_dir)
+                save_model(model, epoch + 1, val_acc, run_dir)
                 print("New best model saved.")
 
             print(

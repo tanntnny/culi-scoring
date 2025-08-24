@@ -1,3 +1,5 @@
+from typing import Tuple, Union, Dict
+
 import torch
 import torchaudio
 import pandas as pd
@@ -54,7 +56,7 @@ def create_collate_fn(
 ):
     audio_processor: Wav2Vec2Processor = Wav2Vec2Processor.from_pretrained(audio_processor)
     text_tokenizer: BertTokenizer = BertTokenizer.from_pretrained(text_tokenizer)
-    def collate_fn(batch):
+    def collate_fn(batch) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], Dict[str, str]]:
         audio_paths, text_paths, ids, labels = zip(*batch)
         waveforms = [np.zeros(16000, np.float64) for _ in audio_paths]
         texts = ['' for _ in text_paths]
@@ -83,11 +85,21 @@ def create_collate_fn(
             return_tensors="pt",
         )
         
-        return {
-            'audio_tokens': audio_tokens,
-            'text_tokens': text_tokens,
-            'ids': ids,
-            'labels': labels
+        x = {
+            "audio_embedding": audio_tokens["input_values"],
+            "audio_attn_mask": audio_tokens["attention_mask"],
+            "text_embedding": text_tokens["input_ids"],
+            "text_attn_mask": text_tokens["attention_mask"]
         }
+        
+        y = {
+            "labels": labels,
+        }
+        
+        ids = {
+            "ids": ids,
+        }
+        
+        return x, y, ids
 
     return collate_fn

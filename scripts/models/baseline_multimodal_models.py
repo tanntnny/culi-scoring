@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Dict
 
 import math
 from pathlib import Path
@@ -13,6 +13,7 @@ from scripts.models.transformer_essentials import (
 )
 from transformers import Wav2Vec2Model, BertModel
 
+# ---------------- Mean Pooler ----------------
 class MeanPooler(nn.Module):
     def forward(self, hidden_states: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         mask = mask.unsqueeze(-1).float()
@@ -168,10 +169,7 @@ class IndividualModalModel(nn.Module):
         text_embeddings  = self._cast_text_inputs(text_embeddings)
 
         # 2) AUDIO (encoder -> LSTM -> masked mean pool)
-        audio_outputs = self.audio_encoder(
-            input_values=audio_embeddings["input_values"],
-            attention_mask=audio_embeddings["attention_mask"]
-        )
+        audio_outputs = self.audio_encoder(**audio_embeddings)
         audio_hidden_states = audio_outputs.last_hidden_state  # (B, T_feat, H)
         B, T_feat, _ = audio_hidden_states.shape
         device = audio_hidden_states.device
@@ -206,10 +204,7 @@ class IndividualModalModel(nn.Module):
             pass
 
         # 3) TEXT (encoder -> LSTM -> masked mean pool)
-        text_outputs = self.text_encoder(
-            input_ids=text_embeddings["input_ids"],
-            attention_mask=text_embeddings["attention_mask"]
-        )
+        text_outputs = self.text_encoder(**text_embeddings)
         text_hidden_states = text_outputs.last_hidden_state  # (B, T_txt, Ht)
         B, T_txt, _ = text_hidden_states.shape
         tdtype = text_hidden_states.dtype
@@ -251,6 +246,7 @@ class CrossModalBlock(nn.Module):
             self,
             dim_q: int,
             dim_kv: int,
+            proj_dim: int,
             n_heads: int = 8,
             dropout: float = 0.1,
     ):
@@ -281,6 +277,9 @@ class CrossModalBlock(nn.Module):
         self.norm_q_2 = nn.LayerNorm(dim_q)
         self.norm_q_3 = nn.LayerNorm(dim_q)
         self.norm_kv = nn.LayerNorm(dim_kv)
+
+        self.proj = nn.Linear(dim_q, proj_dim)
+
         self.dropout = nn.Dropout(dropout)
     
     def forward(
@@ -302,7 +301,9 @@ class CrossModalBlock(nn.Module):
         x, _ = self.self_attn(q_norm, q_norm, q_norm)
         q = q + self.dropout(x)
 
-        return q
+        z = self.proj(q)
+
+        return z
 
 # ---------------- Linguistic Feature Block ----------------
 # TODO
@@ -314,6 +315,7 @@ class CrossModalScorer(nn.Module):
             num_classes: int,
             audio_encoder: Union[str, Path],
             text_encoder: Union[str, Path],
+            cross_attn_hid_dim: int = 768,
             lstm_hidden_dim: int = 512,
             dropout: float = 0.0,
     ):
@@ -327,10 +329,10 @@ class CrossModalScorer(nn.Module):
         text_hid_dim = self.text_encoder.config.hidden_size
         self.text_positional_encoder = PositionalEncoder(dim_embed=text_hid_dim, max_len=5_000)
 
-        self.audio_text_cross_attn = CrossModalBlock(dim_q=audio_hid_dim, dim_kv=text_hid_dim)
-        self.text_audio_cross_attn = CrossModalBlock(dim_q=text_hid_dim, dim_kv=audio_hid_dim)
+        self.audio_text_cross_attn = CrossModalBlock(dim_q=audio_hid_dim, dim_kv=text_hid_dim, proj_dim=cross_attn_hid_dim)
+        self.text_audio_cross_attn = CrossModalBlock(dim_q=text_hid_dim, dim_kv=audio_hid_dim, proj_dim=cross_attn_hid_dim)
 
-        self.bilstm = nn.LSTM(audio_hid_dim + text_hid_dim, lstm_hidden_dim, batch_first=True, bidirectional=True)
+        self.bilstm = nn.LSTM(cross_attn_hid_dim * 2, lstm_hidden_dim, batch_first=True, bidirectional=True)
         self.self_attn = nn.MultiheadAttention(embed_dim=lstm_hidden_dim * 2, num_heads=1, dropout=0.1, batch_first=True)
         self.attn_pooler = AttentionPooler(lstm_hidden_dim * 2)
         self.fc = nn.Sequential(
@@ -342,14 +344,16 @@ class CrossModalScorer(nn.Module):
 
     def forward(
             self,
-            audio_tokens: torch.Tensor,
-            text_tokens: torch.Tensor,
+            audio_embeddings: torch.Tensor,
+            audio_attn_mask: torch.Tensor,
+            text_embeddings: torch.Tensor,
+            text_attn_mask: torch.Tensor
     ):
-        audio_embedding = self.audio_encoder(audio_tokens).last_hidden_state
+        audio_embedding = self.audio_encoder(audio_embeddings, audio_attn_mask).last_hidden_state
         audio_pe = self.audio_positional_encoder(audio_embedding)
         audio_embedding = audio_embedding + audio_pe
 
-        text_embedding = self.text_encoder(**text_tokens).last_hidden_state
+        text_embedding = self.text_encoder(text_embeddings, text_attn_mask).last_hidden_state
         text_pe = self.text_positional_encoder(text_embedding)
         text_embedding = text_embedding + text_pe
 
