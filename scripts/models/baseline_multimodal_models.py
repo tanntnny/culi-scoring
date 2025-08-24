@@ -363,5 +363,5 @@ class CrossModalScorer(nn.Module):
         self_attn_out, _ = self.self_attn(lstm_out, lstm_out, lstm_out)
         pooled = self.attn_pooler(self_attn_out)
 
-        z = self.fc(pooled)
+        z, _ = self.fc(pooled)
         return z
