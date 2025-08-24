@@ -156,7 +156,7 @@ def main():
     # Initialize models, criterion, optimizers, and schedulers
     model = CrossModalScorer(
         num_classes=num_classes,
-        wav2vec2_encoder=WAV2VEC2_ENCODER,
+        audio_encoder=WAV2VEC2_ENCODER,
         text_encoder=BERT_MODEL,
         lstm_hidden_dim=LSTM_HID,
     )
