@@ -344,18 +344,16 @@ class CrossModalScorer(nn.Module):
 
     def forward(
             self,
-            audio_embeddings: torch.Tensor,
+            audio_embedding: torch.Tensor,
             audio_attn_mask: torch.Tensor,
-            text_embeddings: torch.Tensor,
+            text_embedding: torch.Tensor,
             text_attn_mask: torch.Tensor
     ):
-        audio_embedding = self.audio_encoder(audio_embeddings, audio_attn_mask).last_hidden_state
-        audio_pe = self.audio_positional_encoder(audio_embedding)
-        audio_embedding = audio_embedding + audio_pe
+        audio_embedding = self.audio_encoder(audio_embedding, audio_attn_mask).last_hidden_state
+        audio_embedding = self.audio_positional_encoder(audio_embedding)
 
-        text_embedding = self.text_encoder(text_embeddings, text_attn_mask).last_hidden_state
-        text_pe = self.text_positional_encoder(text_embedding)
-        text_embedding = text_embedding + text_pe
+        text_embedding = self.text_encoder(text_embedding, text_attn_mask).last_hidden_state
+        text_embedding = self.text_positional_encoder(text_embedding)
 
         audio_embedding = self.audio_text_cross_attn(audio_embedding, text_embedding)
         text_embedding = self.text_audio_cross_attn(text_embedding, audio_embedding)

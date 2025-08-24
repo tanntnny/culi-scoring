@@ -17,7 +17,7 @@ class PositionalEncoder(nn.Module):
         self.positional_encoding[:, 0::2] = torch.sin(position * div_term)
         self.positional_encoding[:, 1::2] = torch.cos(position * div_term)
         self.positional_encoding = self.positional_encoding.unsqueeze(0)
-        self.register_buffer('positional_encoding', self.positional_encoding)
+        self.register_buffer('pe', self.positional_encoding)
 
     def forward(
                 self,
@@ -25,7 +25,7 @@ class PositionalEncoder(nn.Module):
             ) -> torch.Tensor:
         # x shape : (Batch, Sequence, Feature)
         seq = x.size(1)
-        return self.positional_encoding[:, :seq]
+        return x + self.positional_encoding[:, :seq]
 
 # ---------------- Attention Pooler ----------------
 class AttentionPooler(nn.Module):
