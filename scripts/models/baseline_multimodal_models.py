@@ -361,7 +361,7 @@ class CrossModalScorer(nn.Module):
         concat = torch.cat((audio_embedding, text_embedding), dim=1)
         lstm_out, _ = self.bilstm(concat)
         self_attn_out, _ = self.self_attn(lstm_out, lstm_out, lstm_out)
-        pooled = self.attn_pooler(self_attn_out)
+        pooled, _ = self.attn_pooler(self_attn_out)
 
-        z, _ = self.fc(pooled)
+        z = self.fc(pooled)
         return z
