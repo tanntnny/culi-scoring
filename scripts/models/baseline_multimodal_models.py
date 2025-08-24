@@ -332,7 +332,7 @@ class CrossModalScorer(nn.Module):
         self.audio_text_cross_attn = CrossModalBlock(dim_q=audio_hid_dim, dim_kv=text_hid_dim, proj_dim=cross_attn_hid_dim)
         self.text_audio_cross_attn = CrossModalBlock(dim_q=text_hid_dim, dim_kv=audio_hid_dim, proj_dim=cross_attn_hid_dim)
 
-        self.bilstm = nn.LSTM(cross_attn_hid_dim * 2, lstm_hidden_dim, batch_first=True, bidirectional=True)
+        self.bilstm = nn.LSTM(cross_attn_hid_dim, lstm_hidden_dim, batch_first=True, bidirectional=True)
         self.self_attn = nn.MultiheadAttention(embed_dim=lstm_hidden_dim * 2, num_heads=1, dropout=0.1, batch_first=True)
         self.attn_pooler = AttentionPooler(lstm_hidden_dim * 2)
         self.fc = nn.Sequential(
