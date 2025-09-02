@@ -8,6 +8,10 @@ from torch.utils.data import Dataset
 from transformers import Wav2Vec2Processor, BertTokenizer
 from pathlib import Path
 
+from scripts.utils.pytorch_utils import (
+    Batch
+)
+
 
 def audio_to_tensor(path, frame_rate=16_000):
     waveform, sample_rate = torchaudio.load(path)
@@ -28,9 +32,9 @@ def audio_to_tensor(path, frame_rate=16_000):
 
 class MultimodalSMDataset(Dataset):
     def __init__(self,
-                 data_config: Path,
-                 label_config: Path,
-                 ):
+                 data_config: Union[str, Path],
+                 label_config: Union[str, Path],
+                                  ):
         data_config: pd.DataFrame = pd.read_csv(data_config)
         label_config: pd.DataFrame = pd.read_csv(label_config)
         self.sample = []
@@ -49,57 +53,56 @@ class MultimodalSMDataset(Dataset):
     def __getitem__(self, idx):
         audio_path, text_path, ids, label = self.sample[idx]
         return audio_path, text_path, ids, label
+    
+    @staticmethod
+    def create_collate_fn(
+        audio_processor: Union[str, Path],
+        text_tokenizer: Union[str, Path]
+    ):
+        audio_processor = Wav2Vec2Processor.from_pretrained(audio_processor)
+        text_tokenizer = BertTokenizer.from_pretrained(text_tokenizer)
+    
+        def collate_fn(batch) -> Batch:
+            audio_paths, text_paths, ids, labels = zip(*batch)
+            waveforms = [np.zeros(16000, np.float64) for _ in audio_paths]
+            texts = ['' for _ in text_paths]
+            labels = torch.tensor(labels, dtype=torch.long)
+            for idx, audio_path in enumerate(audio_paths):
+                try:
+                    waveforms[idx], _ = audio_to_tensor(audio_path)
+                except Exception as e:
+                    pass
+            for idx, text in enumerate(text_paths):
+                with open(text,'r', encoding='utf-8') as f:
+                    texts[idx] = f.read().strip()
 
-def create_collate_fn(
-        audio_processor: Path,
-        text_tokenizer: Path
-):
-    audio_processor: Wav2Vec2Processor = Wav2Vec2Processor.from_pretrained(audio_processor)
-    text_tokenizer: BertTokenizer = BertTokenizer.from_pretrained(text_tokenizer)
-    def collate_fn(batch) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], Dict[str, str]]:
-        audio_paths, text_paths, ids, labels = zip(*batch)
-        waveforms = [np.zeros(16000, np.float64) for _ in audio_paths]
-        texts = ['' for _ in text_paths]
-        labels = torch.tensor(labels, dtype=torch.long)
-        for idx, audio_path in enumerate(audio_paths):
-            try:
-                waveforms[idx], _ = audio_to_tensor(audio_path)
-            except Exception as e:
-                pass
-        for idx, text in enumerate(text_paths):
-            with open(text,'r', encoding='utf-8') as f:
-                texts[idx] = f.read().strip()
-
-        # Create embedding
-        audio_tokens = audio_processor(
-            waveforms,
-            sampling_rate=16000,
-            return_tensors="pt",
-            padding=True,
-            return_attention_mask=True
-        )
-        text_tokens = text_tokenizer(
-            list(texts),
-            truncation=True,
-            padding=True,
-            return_tensors="pt",
-        )
-        
-        x = {
-            "audio_embedding": audio_tokens["input_values"],
-            "audio_attn_mask": audio_tokens["attention_mask"],
-            "text_embedding": text_tokens["input_ids"],
-            "text_attn_mask": text_tokens["attention_mask"]
-        }
-        
-        y = {
-            "labels": labels,
-        }
-        
-        ids = {
-            "ids": ids,
-        }
-        
-        return x, y, ids
-
-    return collate_fn
+            # Create embedding
+            audio_tokens = audio_processor(
+                waveforms,
+                sampling_rate=16000,
+                return_tensors="pt",
+                padding=True,
+                return_attention_mask=True
+            )
+            text_tokens = text_tokenizer(
+                list(texts),
+                truncation=True,
+                padding=True,
+                return_tensors="pt",
+            )
+            
+            return Batch(
+                {
+                    "audio_embedding": audio_tokens["input_values"],
+                    "audio_attn_mask": audio_tokens["attention_mask"],
+                    "text_embedding": text_tokens["input_ids"],
+                    "text_attn_mask": text_tokens["attention_mask"]
+                },
+                {
+                    "labels": labels,
+                },
+                {
+                    "ids": ids,
+                }
+            )
+        return collate_fn

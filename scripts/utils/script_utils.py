@@ -1,4 +1,5 @@
 import os
+import torch
 from pathlib import Path
 
 def get_next_run_dir(base_dir="runs"):
@@ -10,3 +11,6 @@ def get_next_run_dir(base_dir="runs"):
     run_dir = base_path / f"run{next_num}"
     run_dir.mkdir(exist_ok=True)
     return run_dir
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)

@@ -22,8 +22,6 @@ from scripts.data.multimodal_dataset import (
     create_collate_fn,
 )
 from scripts.utils.pytorch_utils import (
-    run_epoch,
-    run_eval,
     setup_ddp_from_slurm,
     save_model,
 )
@@ -117,7 +115,7 @@ def main():
     cefr_label_df = pd.read_csv(CEFR_LABEL)
     num_classes = len(cefr_label_df)
 
-    collate_fn = create_collate_fn(WAV2VEC2_PROCESSOR, BERT_TOKENIZER)
+    collate_fn = MultimodalSMDataset.create_collate_fn(WAV2VEC2_PROCESSOR, BERT_TOKENIZER)
     train_dataset = MultimodalSMDataset(TRAIN_DATA, CEFR_LABEL)
     val_dataset = MultimodalSMDataset(VAL_DATA, CEFR_LABEL)
     train_sampler = DistributedSampler(
