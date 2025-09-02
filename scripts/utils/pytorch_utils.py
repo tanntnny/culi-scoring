@@ -22,6 +22,10 @@ class Batch:
             if torch.is_tensor(v): self.inputs[k] = v.to(device, non_blocking=True)
         for k, v in self.outputs.items():
             if torch.is_tensor(v): self.outputs[k] = v.to(device, non_blocking=True)
+    
+    def __iter__(self): # making it { inputs, outputs, meta = batch }
+        return iter((self.inputs, self.outputs, self.meta))
+    
 
 def run_epoch(model, loader, criterion, optimizer=None, scaler=None, device="cuda"):
     is_train = optimizer is not None
