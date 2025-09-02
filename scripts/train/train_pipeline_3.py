@@ -21,7 +21,7 @@ from scripts.data.multimodal_dataset import (
     MultimodalSMDataset,
 )
 from scripts.utils.pytorch_utils import (
-    setup_ddp_from_slurm,
+    initialize_distributed_training,
     save_model,
 )
 
@@ -84,7 +84,7 @@ def main():
 
     # Setup DDP
 
-    world_size, rank, local_rank, gpus_per_node = setup_ddp_from_slurm()
+    world_size, rank, local_rank, gpus_per_node = initialize_distributed_training()
     is_main = rank == 0
     num_workers = CPUS_PER_TASK
     device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
