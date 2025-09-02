@@ -57,6 +57,16 @@ class CrossModalScorer(nn.Module):
             nn.Linear(fc_input_dim, num_classes)
         )
 
+    def get_audio_mask(self, audio_embedding, audio_attn_mask):
+         with torch.no_grad():
+            input_lengths = audio_attn_mask.sum(-1)  # (B,)
+            feat_lengths = self.audio_encoder._get_feat_extract_output_lengths(input_lengths).to(torch.long)  # (B,)
+            B, T_out, _ = audio_embedding.shape
+            audio_out_mask = torch.zeros(B, T_out, device=audio_embedding.device, dtype=audio_embedding.dtype)
+            for i, L in enumerate(feat_lengths):
+                audio_out_mask[i, :min(L.item(), T_out)] = 1.0
+            return audio_out_mask
+
     def forward(
             self,
             audio_embedding: torch.Tensor,
@@ -78,7 +88,7 @@ class CrossModalScorer(nn.Module):
         self_attn_out, _ = self.self_attn(lstm_out, lstm_out, lstm_out)
 
         audio_text_crossed, _ = self.attn_pooler(self_attn_out)
-        audio_pooled = self.mean_pooler(audio_embedding, audio_attn_mask)
+        audio_pooled = self.mean_pooler(audio_embedding, self.get_audio_mask(audio_embedding, audio_attn_mask))
         text_pooled = self.mean_pooler(text_embedding, text_attn_mask)
 
         fusion_features = torch.cat((audio_text_crossed, audio_pooled, text_pooled), dim=1)

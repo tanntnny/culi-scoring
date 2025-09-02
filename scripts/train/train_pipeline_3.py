@@ -21,6 +21,7 @@ from scripts.data.multimodal_dataset import (
     MultimodalSMDataset,
 )
 from scripts.utils.pytorch_utils import (
+    Batch,
     initialize_distributed_training,
     save_model,
 )
@@ -201,23 +202,21 @@ def main():
         
         model.train()
         for _, batch in enumerate(train_dataloader):
-            x, y, ids = batch
-            for key, value in x.items():
-                if torch.is_tensor(value): x[key] = value.to(device, non_blocking=True)
-            for key, value in y.items():
-                if torch.is_tensor(value): y[key] = value.to(device, non_blocking=True)
-            
+            batch: Batch = batch
+            batch.to_device(device)
+            inputs, outputs, meta = batch
+
             with torch.cuda.amp.autocast(enabled=scaler is not None):
-                outputs = model(**x)
-                loss = criterion(outputs, y["labels"])
+                out = model(**inputs)
+                loss = criterion(out, outputs["labels"])
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()
 
-            preds = outputs.argmax(1)
+            preds = out.argmax(1)
             train_loss += loss.item() * preds.size(0)
-            train_acc += (preds == y["labels"]).sum().item()
+            train_acc += (preds == outputs["labels"]).sum().item()
             n += preds.size(0)
         train_loss = train_loss / max(n, 1)
         train_acc = train_acc / max(n, 1)
@@ -226,17 +225,15 @@ def main():
         model.eval()
         with torch.no_grad():
             for _, batch in enumerate(val_dataloader):
-                x, y, ids = batch
-                for key, value in x.items():
-                    if torch.is_tensor(value): x[key] = value.to(device, non_blocking=True)
-                for key, value in y.items():
-                    if torch.is_tensor(value): y[key] = value.to(device, non_blocking=True)
+                batch: Batch = batch
+                batch.to_device(device)
+                inputs, outputs, meta = batch
 
-                outputs = model(**x)
-                loss = criterion(outputs, y["labels"])
-                val_loss += loss.item() * outputs.size(0)
-                preds = outputs.argmax(1)
-                val_acc += (preds == y["labels"]).sum().item()
+                out = model(**inputs)
+                loss = criterion(out, outputs["labels"])
+                val_loss += loss.item() * out.size(0)
+                preds = out.argmax(1)
+                val_acc += (preds == outputs["labels"]).sum().item()
                 n += preds.size(0)
             val_loss = val_loss / max(n, 1)
             val_acc = val_acc / max(n, 1)
