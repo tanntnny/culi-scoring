@@ -14,12 +14,11 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import (
     get_cosine_schedule_with_warmup,
 )
-from scripts.models.baseline_multimodal_models import (
+from scripts.models.crossmodal_models import (
     CrossModalScorer,
 )
 from scripts.data.multimodal_dataset import (
     MultimodalSMDataset,
-    create_collate_fn,
 )
 from scripts.utils.pytorch_utils import (
     setup_ddp_from_slurm,
