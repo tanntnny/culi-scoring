@@ -1,0 +1,4 @@
+data:
+  name: icnale
+  train: datasets/processed/
+  val: datasets/processed/

@@ -201,7 +201,7 @@ def main():
         train_loss, train_acc, n = 0.0, 0, 0
         
         model.train()
-        for _, batch in enumerate(train_dataloader):
+        for batch_idx, batch in enumerate(train_dataloader):
             batch: Batch = batch
             batch.to_device(device)
             inputs, outputs, meta = batch
@@ -218,6 +218,9 @@ def main():
             train_loss += loss.item() * preds.size(0)
             train_acc += (preds == outputs["labels"]).sum().item()
             n += preds.size(0)
+            
+            if is_main and (batch_idx + 1) % 100 == 0:
+                print(f"  Batch {batch_idx + 1}/{len(train_dataloader)} - Loss: {loss.item():.4f}")
         train_loss = train_loss / max(n, 1)
         train_acc = train_acc / max(n, 1)
 

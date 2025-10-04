@@ -1,0 +1,11 @@
+defaults:
+  - data: icnale_base
+  - model: crossmodal_base
+  - task: classification
+  - train: base
+  - eval: base
+  - prepare: base
+
+seed: 42
+output_dir: ${hydra:run.dir}
+cmd: train

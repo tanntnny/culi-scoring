@@ -6,15 +6,13 @@ import torch.nn as nn
 
 from transformers import Wav2Vec2Model, BertModel
 
-from scripts.models.base_model import (
-    MeanPooler,
-)
+from .base import ModelModule
 
-from scripts.models.transformer_essentials import (
-    CrossModalBlock,
-    PositionalEncoder,
-    AttentionPooler
-)
+from .attentions import CrossModalBlock
+from .poolers import AttentionPooler, MeanPooler
+from .encoders import PositionalEncoder
+
+from ..registry import register
 
 # ---------------- Cross-Modal Scorer ----------------
 class CrossModalScorer(nn.Module):
@@ -66,6 +64,9 @@ class CrossModalScorer(nn.Module):
             for i, L in enumerate(feat_lengths):
                 audio_out_mask[i, :min(L.item(), T_out)] = 1.0
             return audio_out_mask
+    
+    def get_text_mask(self, text_embedding, text_attn_mask):
+        return text_attn_mask.to(text_embedding.dtype)
 
     def forward(
             self,
@@ -89,9 +90,23 @@ class CrossModalScorer(nn.Module):
 
         audio_text_crossed, _ = self.attn_pooler(self_attn_out)
         audio_pooled = self.mean_pooler(audio_embedding, self.get_audio_mask(audio_embedding, audio_attn_mask))
-        text_pooled = self.mean_pooler(text_embedding, text_attn_mask)
+        text_pooled = self.mean_pooler(text_embedding, self.get_text_mask(text_embedding, text_attn_mask))
 
         fusion_features = torch.cat((audio_text_crossed, audio_pooled, text_pooled), dim=1)
 
         z = self.fc(fusion_features)
         return z
+
+# REGISTER
+
+@register("model", "crossmodal")
+def build_crossmodal(cfg) -> ModelModule:
+    model = CrossModalScorer(
+        cfg.model.num_classes,
+        cfg.model.audio_encoder,
+        cfg.model.text_encoder,
+        cfg.model.cross_attn_hid_dim,
+        cfg.model.lstm_hidden_dim,
+        cfg.model.dropout,
+    )
+    return model

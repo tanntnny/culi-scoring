@@ -1,0 +1,9 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Protocol, Optional
+from torch.utils.data import DataLoader, Dataset
+
+class DataModule(Protocol):
+    def train_dataloader(self) -> DataLoader: ...
+    def val_dataloader(self) -> Optional[DataLoader]: ...
+    def test_dataloader(self) -> Optional[DataLoader]: ...
