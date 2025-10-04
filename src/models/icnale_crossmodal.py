@@ -73,7 +73,8 @@ class CrossModalScorer(nn.Module):
             audio_embedding: torch.Tensor,
             audio_attn_mask: torch.Tensor,
             text_embedding: torch.Tensor,
-            text_attn_mask: torch.Tensor
+            text_attn_mask: torch.Tensor,
+            **kwargs,
     ):
         audio_embedding = self.audio_encoder(audio_embedding, audio_attn_mask).last_hidden_state
         audio_pe = self.audio_positional_encoder(audio_embedding)

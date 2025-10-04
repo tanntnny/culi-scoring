@@ -14,10 +14,10 @@ def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad
     global_step = global_step_start
     optimizer.zero_grad(set_to_none=True)
     for i, batch in enumerate(loader):
-        batch = [b.to(device) if hasattr(b, "to") else b for b in batch]
+        batch = batch.to(device)
         with autocast:
             out = task.training_step(batch, model)
-            loss = out["loss"] / grad_accum
+            loss = out["train/loss"] / grad_accum
         if scaler.is_enabled():
             scaler.scale(loss).backward()
         else:
@@ -34,8 +34,8 @@ def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad
             optimizer.zero_grad(set_to_none=True)
             if scheduler is not None:
                 scheduler.step()
-        if (i + 1) % log_every_n == 0 and logger is not None:
-            logger.log_scalars({"train/loss": loss.item()*grad_accum}, global_step)
+        if "logs" in out and (i + 1) % log_every_n == 0 and logger is not None:
+            logger.log_scalars(out["logs"], global_step)
         global_step += 1
     return global_step
 
@@ -46,11 +46,11 @@ def validate(model, task, loader, device, logger, global_step):
     total_loss = 0.0; n = 0
     with torch.no_grad():
         for batch in loader:
-            batch = [b.to(device) if hasattr(b, "to") else b for b in batch]
+            batch = batch.to(device)
             out = task.validation_step(batch, model)
             total_loss += float(out.get("val/loss", 0.0)); n += 1
-    logs = task.reduce()
-    logs["val/loss"] = total_loss / max(n, 1)
+    metrics = task.reduce()
+    metrics["val/loss"] = total_loss / max(n, 1)
     if logger is not None:
-        logger.log_scalars(logs, global_step)
-    return logs
+        logger.log_scalars(metrics, global_step)
+    return metrics

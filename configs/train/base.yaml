@@ -3,6 +3,6 @@ train:
   optimizer: adamw
   lr: 1e-4
   weight_decay: 0.01
-  epoch: 20
+  epochs: 20
   batch: 4
   num_workers: 4
