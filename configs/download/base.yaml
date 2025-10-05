@@ -1,9 +1,5 @@
-defaults:
-  - _self_
-
-download:
-  name: icnale
-  save: models/
-  wav2vec2: facebook/wav2vec2-base
-  bert: bert-base-uncased
-  tokenizer: bert-base-uncased
+name: icnale
+save: models/
+wav2vec2: facebook/wav2vec2-base
+bert: bert-base-uncased
+tokenizer: bert-base-uncased
