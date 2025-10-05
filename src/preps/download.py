@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from ..registry import build, list_registered
+from ..registry import build
+
+from .icnale_download import build_icnale_downloader
 
 # ---------------- Download ----------------
 def run_download(cfg):
-    list_registered()
     downloader = build("downloader", cfg.download.name, cfg=cfg)
     downloader.download()
