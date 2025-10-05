@@ -18,3 +18,7 @@ def build(kind: str, name: str, **kwargs):
         return _REGISTRY[kind][name](**kwargs)
     except KeyError as e:
         raise KeyError(f"No builder for {kind}:{name}") from e
+
+def list_registered() -> list[str]:
+    for kind in _REGISTRY:
+        print(f"{kind}: {list(_REGISTRY[kind].keys())}")
