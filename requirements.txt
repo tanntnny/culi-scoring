@@ -1,18 +1,18 @@
-torch>=2.2
-torchvision>=0.17
-torchaudio
+torch>=2.2.0
+torchvision>=0.17.0
+torchaudio>=2.2.0
 transformers>=4.36.0
-tensorboard>=2.14
+tensorboard>=2.14.0
 
-scikit-learn
-numpy
-pandas
+scikit-learn>=1.3.0
+numpy>=1.24.0
+pandas>=2.0.0
 
-omegaconf>=2.3
-hydra-core>=1.3
-pyyaml>=6.0
-tqdm>=4.66
+omegaconf>=2.3.0
+hydra-core>=1.3.0
+pyyaml>=6.0.0
+tqdm>=4.66.0
 
 packaging>=24.0
 
-google-cloud-storage
+google-cloud-storage>=2.10.0

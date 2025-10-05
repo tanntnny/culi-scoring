@@ -5,6 +5,7 @@ defaults:
   - train: base
   - eval: base
   - pipeline: base
+  - download: base
 
 seed: 42
 output_dir: ${hydra:run.dir}
