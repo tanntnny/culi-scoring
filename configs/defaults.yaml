@@ -4,8 +4,8 @@ defaults:
   - task: classification
   - train: base
   - eval: base
-  - prepare: base
+  - pipeline: base
 
 seed: 42
 output_dir: ${hydra:run.dir}
-cmd: train
+cmd: train # train | eval | pipeline | download

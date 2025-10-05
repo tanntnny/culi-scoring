@@ -3,5 +3,8 @@ This repository contains code and resources for the CULI Scoring project, which 
 
 > In project reconstruction process.
 
+## Project Structure
+- `datasets/raw/SM/`: Raw data from the SM dataset.
+
 ## More Information
 * All the training procedures are run in **LANTA**, using Distributed Data Parallel (DDP) with 4 GPUs.

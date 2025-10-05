@@ -4,8 +4,8 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from .engine.trainer import Trainer
 from .engine.evaluator import Evaluator
-from .pipelines.prepare import run_prepare
-from .pipelines.download import run_download
+from .preps.pipeline import run_pipeline
+from .preps.download import run_download
 from .utils.seed import seed_everything
 
 @hydra.main(version_base=None, config_path="../configs", config_name="defaults")
@@ -18,10 +18,10 @@ def main(cfg: DictConfig) -> None:
         Trainer(cfg).fit()
     elif cmd == "eval":
         Evaluator(cfg).run()
-    elif cmd == "prepare":
-        run_prepare(cfg)     # data processing
+    elif cmd == "pipeline":
+        run_pipeline(cfg)
     elif cmd == "download":
-        run_download(cfg)    # model/files cache
+        run_download(cfg)
     else:
         raise SystemExit(f"Unknown cmd={cmd}")
 
