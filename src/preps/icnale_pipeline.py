@@ -17,19 +17,12 @@ from ..utils.io import save_checkpoint
 
 from .icnale_helpers import get_valid_files, get_id_from_icnale, get_label_from_icnale
 
-"""
-TODO: Create the ICNALE pipeline that includes all the preprocessing steps necessary for the ICNALE dataset.
-    1. Clean datasets
-    2. Tokenize text and encode audio and create log-mel
-    3. KFoldStratifiedGroup split
-"""
-
 # ---------------- Pipeline ----------------
 class ICNALEPipeline(BasePipeline):
     def __init__(self, cfg):
         self.cfg = cfg
-        self.tokenizer = BertTokenizer.from_pretrained(self.cfg.pipeline.text_tokenizer)
-        self.audio_processor = Wav2Vec2Processor.from_pretrained(self.cfg.pipeline.audio_encoder)
+        self.tokenizer = BertTokenizer.from_pretrained(self.cfg.pipeline.tokenizer)
+        self.audio_processor = Wav2Vec2Processor.from_pretrained(self.cfg.pipeline.encoder)
 
     def preprocess_text(self, text: str) -> Dict[str, torch.Tensor]:
         tokens = self.tokenizer(

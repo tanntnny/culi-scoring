@@ -1,2 +1,19 @@
-pipeline:
-  name: icnale
+name: icnale
+
+src: datasets/raw/SM
+save: datasets/processed/SM
+
+tokenizer: models/bert-tokenizer
+encoder: models/wav2vec2-processor
+
+target_sample_rate: 16000
+audio_sample_rate: 16000
+logmel_sample_rate: 16000
+
+logmel_n: 80
+logmel_n_fft: 400
+logmel_hop_length: 160
+logmel_win_length: 400
+
+# ---------------- KFold Validation ----------------
+k_folds: 5

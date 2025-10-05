@@ -1,4 +1,3 @@
-data:
-  name: icnale
-  train: datasets/processed/
-  val: datasets/processed/
+name: icnale
+train: datasets/processed/
+val: datasets/processed/
