@@ -4,6 +4,5 @@ from ..registry import build
 
 # ---------------- Download ----------------
 def run_download(cfg):
-    print(cfg.pretty())
     downloader = build("downloader", cfg.download.name, cfg)
     downloader.download()
