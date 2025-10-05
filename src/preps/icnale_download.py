@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import os
 
 from transformers import (
@@ -19,7 +20,7 @@ class ICNALEDownloader(BaseDownloader):
 
     def download(self):
         print(f"Downloading the models, tokenizers, and processors ...")
-        save = self.cfg.download.save
+        save = Path(self.cfg.download.save)
         os.makedirs(save, exist_ok=True)
 
         Wav2Vec2Model.from_pretrained(self.cfg.download.wav2vec2, use_safetensors=True).save_pretrained(save / "wav2vec2-model")
