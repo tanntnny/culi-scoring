@@ -1,5 +1,3 @@
-#!/bin/bash
-
 #SBATCH --job-name=train
 
 #SBATCH --partition=gpu-limited
@@ -7,7 +5,7 @@
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=16
-#SBATCH --time=04:00:00
+#SBATCH --time==:00:00
 
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
