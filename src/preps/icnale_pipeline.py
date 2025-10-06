@@ -80,14 +80,14 @@ class ICNALEPipeline(BasePipeline):
 
             if ext in [".wav", ".mp3"]:
                 encoded, log_mel_spectrogram = self.preprocess_audio(f)
-                save_checkpoint(encoded, audio_folder / f"{fid}_audio.pt")
-                save_checkpoint(log_mel_spectrogram, logmel_folder / f"{fid}_logmel.pt")
+                save_checkpoint(audio_folder / f"{fid}_audio.pt", encoded)
+                save_checkpoint(logmel_folder / f"{fid}_logmel.pt", log_mel_spectrogram)
 
             elif ext in [".txt"]:
                 with open(f, 'r', encoding='utf-8') as file:
                     text = file.read().strip()
                 tokens = self.preprocess_text(text)
-                save_checkpoint(tokens, token_folder / f"{fid}_token.pt")
+                save_checkpoint(token_folder / f"{fid}_token.pt", tokens)
 
         # ---------------- KFold Splitting ----------------
         print(f"Splitting dataset into K-Folds ...")
