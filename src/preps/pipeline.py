@@ -6,5 +6,5 @@ from .icnale_pipeline import build_icnale_pipeline
 
 # ---------------- Preparation ----------------
 def run_pipeline(cfg):
-    pipeline = build("pipeline", cfg.pipeline.name, cfg)
+    pipeline = build("pipeline", cfg.pipeline.name, cfg=cfg)
     pipeline.run()
