@@ -82,7 +82,7 @@ def main() -> int:
     parser.add_argument(
         "--ext",
         nargs="*",
-        default=[".txt", ".log", ".err"],
+        default=[".txt", ".log", ".err", ".out"],
         help="File extensions to monitor ('.log' or 'log')."
     )
     parser.add_argument(
