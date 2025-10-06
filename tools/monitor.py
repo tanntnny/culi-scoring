@@ -89,7 +89,7 @@ def main() -> int:
         "--n",
         type=int,
         default=1,
-        help="How many files per extension to show."
+        help="How many files per source to show."
     )
     parser.add_argument(
         "--since",
@@ -118,30 +118,34 @@ def main() -> int:
     since = args.since if args.since is not None else float("-inf")
     until = args.until if args.until is not None else float("inf")
 
-    by_ext = {ext: [] for ext in exts}
+    by_src = {}
     for f in all_files:
         try:
-            if f.suffix.lower() in by_ext:
-                mtime = f.stat().st_mtime
-                if since <= mtime <= until:
-                    by_ext[f.suffix.lower()].append(f)
+            mtime = f.stat().st_mtime
+            if since <= mtime <= until and f.suffix.lower() in exts:
+                for src in src_paths:
+                    if f.is_relative_to(src):
+                        src_str = str(src)
+                        if src_str not in by_src:
+                            by_src[src_str] = []
+                        by_src[src_str].append(f)
+                        break
         except (FileNotFoundError, PermissionError):
             # File might disappear between listing and stat, or be unreadable
             continue
 
     # Report
-    for ext in exts:
-        files = by_ext[ext]
+    for src_str, files in by_src.items():
         if not files:
-            print(f"No {ext} files found in range.")
+            print(f"No matching files in {src_str}.")
             continue
-        chosen = pick(files, args.n, args.select)
+        chosen = pick(files, 1, args.select)
         for i, path in enumerate(chosen, 1):
             try:
                 mtime = path.stat().st_mtime
-                print(f"{args.select.title()} {ext} #{i}: {path}  (mtime: {human_time(mtime)})")
+                print(f"{args.select.title()} in {src_str} #{i}: {path}  (mtime: {human_time(mtime)})")
             except (FileNotFoundError, PermissionError):
-                print(f"{args.select.title()} {ext} #{i}: {path}  (mtime: <unavailable>)")
+                print(f"{args.select.title()} in {src_str} #{i}: {path}  (mtime: <unavailable>)")
     return 0
 
 if __name__ == "__main__":
