@@ -5,7 +5,15 @@ import torch
 
 from .protocol import BatchProtocol
 
-# ---------------- Batch ----------------
+# ---------------- Sample ---------------- # returned from dateset __getitem__
+@dataclass
+class Sample:
+    """Concrete implementation of Sample for handling individual data samples."""
+    inputs: Dict[str, torch.Tensor]
+    outputs: Dict[str, torch.Tensor]
+    meta: Optional[Dict[str, Any]] = None
+
+# ---------------- Batch ---------------- # returned from collate function
 @dataclass
 class Batch(BatchProtocol):
     """Concrete implementation of BatchProtocol for handling training batches."""

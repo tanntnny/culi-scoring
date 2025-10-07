@@ -1,6 +1,6 @@
 name: icnale
-features: # embeddings | tokens | logmel
-  - embeddings
+features: # encoded | tokens | logmel
+  - encoded
   - tokens
   - logmel
 train: datasets/processed/SM/fold_0_train.csv

@@ -8,12 +8,15 @@ Configuration
 """
 
 from pathlib import Path
+from typing import List
 
+import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.distributed import DistributedSampler
 import pandas as pd
 
-from ..interfaces import DataModule
+from ..interfaces.protocol import DataModule
+from ..interfaces.data import Sample
 from ..core.registry import register
 from ..core.io import load_checkpoint
 from ..core.distributed import is_dist
@@ -29,31 +32,33 @@ label_mapping = {
 
 # ---------------- ICNALE Dataset ----------------
 
-class MultimodalModalDataset(Dataset):
-    def __init__(self, src: Path):
+class MultimodalDataset(Dataset):
+    def __init__(self, src: Path, features: list[str] = []):
         data = pd.read_csv(src)
-        self._ensure_columns(data)
-        self.sample = []
+        self._ensure_columns(data, features)
+        self.samples: List[Sample] = []
         for _, row in data.iterrows():
-            audio_path = row["audio_path"]
-            text_path = row["text_path"]
-            label = row["label"]
-            meta = row["meta"]
-            self.sample.append((
-                load_checkpoint(audio_path),
-                load_checkpoint(text_path),
-                label_mapping[label],
-                meta
-            ))
+            inputs = {}
+            outputs = {}
+            meta = {}
+
+            for feat in features:
+                path = row[feat]
+                tensor = load_checkpoint(path)
+                inputs[feat] = tensor
+            outputs["label"] = torch.tensor(label_mapping[row["label"]], dtype=tensor.long)
+            meta["id"] = row.get("id", None)
+
+            self.samples.append(Sample(inputs=inputs, outputs=outputs, meta=meta))
 
     def __len__(self):
-        return len(self.sample)
-    
+        return len(self.samples)
+
     def __getitem__(self, idx):
-        return self.sample[idx] # (audio_embedding, text_id, label, meta)
-    
-    def _ensure_columns(self, df):
-        columns = ("audio_path", "text_path", "label", "meta")
+        return self.samples[idx]
+
+    def _ensure_columns(self, df, features):
+        columns = ["label"] + features
         missings = [col for col in columns if col not in df.columns]
         if missings:
             raise ValueError(
@@ -62,17 +67,19 @@ class MultimodalModalDataset(Dataset):
 
 class ICNALEDataModule(DataModule):
     def __init__(self, cfg):
-        train_src = cfg.data.train
-        val_src = cfg.data.val
-        test_src = cfg.data.get("test", None)
-        variant = cfg.data.get("variant", ["embeddings", "tokens", "logmel"]) # list of "embeddings" | "tokens" | "logmel"
+        if cfg.data.get("features", None) is None:
+            raise ValueError("Please specify at least one feature in cfg.data.features")
         
-        self.train_dataset = MultimodalModalDataset(train_src)
-        self.val_dataset = MultimodalModalDataset(val_src)
-        self.test_dataset = MultimodalModalDataset(test_src)
+        for feat in cfg.data.features:
+            if feat not in ["encoded", "tokens", "logmel"]:
+                raise ValueError(f"Unsupported feature: {feat}. Supported features are ['encoded', 'tokens', 'logmel']")
+
+        self.cfg = cfg
 
     def train_dataloader(self):
         sampler = None
+        train_src = self.cfg.data.train
+        self.train_dataset = MultimodalDataset(train_src, self.cfg.data.get("features", []))
         if is_dist():
             sampler = DistributedSampler(
                 self.train_dataset,
@@ -90,6 +97,8 @@ class ICNALEDataModule(DataModule):
 
     def val_dataloader(self):
         sampler = None
+        val_src = self.cfg.data.val
+        self.val_dataset = MultimodalDataset(val_src, self.cfg.data.get("features", []))
         if is_dist():
             sampler = DistributedSampler(
                 self.val_dataset,
@@ -106,11 +115,28 @@ class ICNALEDataModule(DataModule):
         )
 
     def test_dataloader(self):
-        # TODO
-        return super().test_dataloader()
+        sampler = None
+        test_src = self.cfg.data.get("test", None)
+        if test_src is None:
+            return None
+
+        self.test_dataset = MultimodalDataset(test_src, self.cfg.data.get("features", []))
+        if is_dist():
+            sampler = DistributedSampler(
+                self.test_dataset,
+                shuffle=False,
+                drop_last=False,
+        )
+        return DataLoader(
+            dataset=self.test_dataset,
+            batch_size=self.cfg.train.batch,
+            sampler=sampler,
+            shuffle=False,
+            num_workers=self.cfg.train.num_workers,
+            pin_memory=True,
+        )
 
 # ---------------- Register ----------------
-
 @register("data", "icnale")
 def build_icnale(cfg) -> DataModule:
     datamodule = ICNALEDataModule(cfg)

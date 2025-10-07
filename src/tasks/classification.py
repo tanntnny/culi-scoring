@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from ..interfaces.protocol import BaseTask, ModelModule
 from ..metrics.classification import ConfusionMatrix
-from ..interfaces.batch import Batch
+from ..interfaces.data import Batch
 
 # ---------------- Classification Task ----------------
 class ClassificationTask(BaseTask):
