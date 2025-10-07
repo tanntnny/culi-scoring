@@ -2,10 +2,21 @@ from __future__ import annotations
 
 from pathlib import Path
 from huggingface_hub import snapshot_download
-from transformers import AutoProcessor
+import shutil
 
 from .base import BaseDownloader
 from ..registry import register
+
+PROCESSOR_FILES = {
+    "processor_config.json",
+    "preprocessor_config.json",
+    "tokenizer_config.json",
+    "special_tokens_map.json",
+    "added_tokens.json",
+    "vocab.json",
+    "merges.txt",
+    "tokenizer.json",
+}
 
 # ---------------- Phi4 Downloader ----------------
 class Phi4Downloader(BaseDownloader):
@@ -25,30 +36,22 @@ class Phi4Downloader(BaseDownloader):
         snapshot_download(
             repo_id=repo_id,
             local_dir=str(model_dir),
-            local_dir_use_symlinks=False,
-            revision=getattr(self.cfg.download, "revision", "main"),  # optional pin
+            revision=getattr(self.cfg.download, "revision", "main"),  # optional pin (commit hash / tag)
         )
 
         processor_dir = save_root / "phi4-processor"
         processor_dir.mkdir(parents=True, exist_ok=True)
 
-        processor = AutoProcessor.from_pretrained(
-            repo_id,
-            trust_remote_code=True
-        )
-        processor.save_pretrained(processor_dir)
+        copied = 0
+        for fname in PROCESSOR_FILES:
+            src = model_dir / fname
+            if src.exists():
+                shutil.copy2(src, processor_dir / fname)
+                copied += 1
 
-        for attr in ("audio_tokenizer", "image_tokenizer", "tokenizer"):
-            if not hasattr(processor, attr):
-                setattr(processor, attr, None)
-        if not hasattr(processor, "feature_extractor"):
-            setattr(processor, "feature_extractor", None)
-        if not hasattr(processor, "image_processor"):
-            setattr(processor, "image_processor", None)
-        if not hasattr(processor, "processor"):
-            setattr(processor, "processor", None)
-
-        print(f"Download complete.\n- Model files: {model_dir}\n- Processor:   {processor_dir}")
+        print(f"Download complete.")
+        print(f"- Model files: {model_dir}")
+        print(f"- Processor:   {processor_dir} (copied {copied} files)")
 
 @register("downloader", "phi4")
 def build_phi4_downloader(cfg):
