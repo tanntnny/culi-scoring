@@ -2,6 +2,5 @@ name: icnale
 features: # encoded | tokens | logmel
   - encoded
   - tokens
-  - logmel
 train: datasets/processed/SM/fold_0_train.csv
 val: datasets/processed/SM/fold_0_val.csv

@@ -16,7 +16,7 @@ from torch.utils.data.distributed import DistributedSampler
 import pandas as pd
 
 from ..interfaces.protocol import DataModule
-from ..interfaces.data import Sample
+from ..interfaces.data import Sample, Batch
 from ..core.registry import register
 from ..core.io import load_checkpoint
 from ..core.distributed import is_dist
@@ -30,6 +30,37 @@ label_mapping = {
     "B20": 3,
 }
 
+# ---------------- Collate Function ----------------
+def collate_fn(batch: List[Sample]) -> Batch:
+    batched = Batch(inputs={}, outputs={}, meta={})
+
+    input_keys = batch[0].inputs.keys()
+    for key in input_keys:
+        tensors = [sample.inputs[key] for sample in batch]
+        if all(isinstance(t, torch.Tensor) for t in tensors):
+            batched.inputs[key] = torch.stack(tensors)
+        else:
+            batched.inputs[key] = tensors
+
+    output_keys = batch[0].outputs.keys()
+    for key in output_keys:
+        tensors = [sample.outputs[key] for sample in batch]
+        if all(isinstance(t, torch.Tensor) for t in tensors):
+            batched.outputs[key] = torch.stack(tensors)
+        else:
+            batched.outputs[key] = tensors
+
+    meta_keys = batch[0].meta.keys() if batch[0].meta else []
+    for key in meta_keys:
+        metas = [sample.meta[key] for sample in batch]
+        batched.meta[key] = metas
+
+    for k in batched.inputs:
+        if isinstance(batched.inputs[k], list) and all(isinstance(t, torch.Tensor) for t in batched.inputs[k]):
+            batched.inputs[k] = torch.nn.utils.rnn.pad_sequence(batched.inputs[k], batch_first=True, padding_value=0)
+
+    return batched
+
 # ---------------- ICNALE Dataset ----------------
 
 class MultimodalDataset(Dataset):
@@ -37,16 +68,27 @@ class MultimodalDataset(Dataset):
         data = pd.read_csv(src)
         self._ensure_columns(data, features)
         self.samples: List[Sample] = []
+        
         for _, row in data.iterrows():
             inputs = {}
             outputs = {}
             meta = {}
 
+            if row["label"] not in label_mapping:
+                raise ValueError(f"Unknown label: {row['label']}")
+
             for feat in features:
                 path = row[feat]
-                tensor = load_checkpoint(path)
-                inputs[feat] = tensor
-            outputs["label"] = torch.tensor(label_mapping[row["label"]], dtype=tensor.long)
+                try:
+                    if feat == "encoded":
+                        tensor_data = load_checkpoint(path)
+                    else:
+                        tensor_data = torch.load(path)
+                    inputs[feat] = tensor_data
+                except Exception as e:
+                    raise ValueError(f"Failed to load {feat} from {path}: {e}")
+                    
+            outputs["label"] = torch.tensor(label_mapping[row["label"]], dtype=torch.long)
             meta["id"] = row.get("id", None)
 
             self.samples.append(Sample(inputs=inputs, outputs=outputs, meta=meta))
@@ -93,6 +135,7 @@ class ICNALEDataModule(DataModule):
             shuffle=(sampler is None),
             num_workers=self.cfg.train.num_workers,
             pin_memory=True,
+            collate_fn=collate_fn,
         )
 
     def val_dataloader(self):
@@ -112,6 +155,7 @@ class ICNALEDataModule(DataModule):
             shuffle=False,
             num_workers=self.cfg.train.num_workers,
             pin_memory=True,
+            collate_fn=collate_fn,
         )
 
     def test_dataloader(self):
@@ -126,7 +170,7 @@ class ICNALEDataModule(DataModule):
                 self.test_dataset,
                 shuffle=False,
                 drop_last=False,
-        )
+            )  # Fix: Add missing parenthesis
         return DataLoader(
             dataset=self.test_dataset,
             batch_size=self.cfg.train.batch,
@@ -134,6 +178,7 @@ class ICNALEDataModule(DataModule):
             shuffle=False,
             num_workers=self.cfg.train.num_workers,
             pin_memory=True,
+            collate_fn=collate_fn,
         )
 
 # ---------------- Register ----------------

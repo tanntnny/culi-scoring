@@ -1,7 +1,7 @@
 name: crossmodal
 num_classes: 4
 audio_encoder: models/wav2vec2-base
-text_encoder: model/bert-base-uncased
+text_encoder: models/bert-base-uncased
 cross_attn_hid_dim: 768
 lstm_hidden_dim: 512
 dropout: 0.1
