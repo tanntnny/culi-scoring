@@ -3,6 +3,7 @@ from __future__ import annotations
 from ..registry import build
 
 from .icnale_download import build_icnale_downloader
+from .phi4_download import build_phi4_downloader
 
 # ---------------- Download ----------------
 def run_download(cfg):
