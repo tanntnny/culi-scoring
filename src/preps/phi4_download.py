@@ -19,6 +19,7 @@ class Phi4Downloader(BaseDownloader):
         save.mkdir(parents=True, exist_ok=True)
         model = AutoModelForCausalLM.from_pretrained(
             self.cfg.download.model,
+            trust_remote_code=True,
             torch_dtype="auto",
             device_map="auto"
         )
