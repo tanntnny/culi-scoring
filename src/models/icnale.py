@@ -70,16 +70,16 @@ class CrossModalScorer(nn.Module):
 
     def forward(
             self,
-            audio_embedding: torch.Tensor,
-            audio_attn_mask: torch.Tensor,
-            text_embedding: torch.Tensor,
-            text_attn_mask: torch.Tensor,
+            tokens: torch.Tensor, # token ids from bert tokenizer
+            tokens_mask: torch.Tensor, # attention mask for tokens
+            encoded: torch.Tensor, # audio features out from wav2vec2 processor
+            encoded_mask: torch.Tensor, # attention mask for audio features
             **kwargs,
     ):
-        audio_embedding = self.audio_encoder(audio_embedding, audio_attn_mask).last_hidden_state
+        audio_embedding = self.audio_encoder(encoded, encoded_mask).last_hidden_state
         audio_pe = self.audio_positional_encoder(audio_embedding)
 
-        text_embedding = self.text_encoder(text_embedding, text_attn_mask).last_hidden_state
+        text_embedding = self.text_encoder(tokens, tokens_mask).last_hidden_state
         text_pe = self.text_positional_encoder(text_embedding)
 
         audio_cross_attn = self.audio_text_cross_attn(audio_pe, text_pe)
@@ -90,18 +90,18 @@ class CrossModalScorer(nn.Module):
         self_attn_out, _ = self.self_attn(lstm_out, lstm_out, lstm_out)
 
         audio_text_crossed, _ = self.attn_pooler(self_attn_out)
-        audio_pooled = self.mean_pooler(audio_embedding, self.get_audio_mask(audio_embedding, audio_attn_mask))
-        text_pooled = self.mean_pooler(text_embedding, self.get_text_mask(text_embedding, text_attn_mask))
+        audio_pooled = self.mean_pooler(audio_embedding, self.get_audio_mask(audio_embedding, encoded_mask))
+        text_pooled = self.mean_pooler(text_embedding, self.get_text_mask(text_embedding, tokens_mask))
 
         fusion_features = torch.cat((audio_text_crossed, audio_pooled, text_pooled), dim=1)
 
         z = self.fc(fusion_features)
         return z
 
-# REGISTER
+# ---------------- Register ----------------
 
-@register("model", "crossmodal")
-def build_crossmodal(cfg) -> ModelModule:
+@register("model", "icnale")
+def build_icnale(cfg) -> ModelModule:
     model = CrossModalScorer(
         cfg.model.num_classes,
         cfg.model.audio_encoder,

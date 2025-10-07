@@ -1,4 +1,4 @@
-name: crossmodal
+name: icnale
 num_classes: 4
 audio_encoder: models/wav2vec2-base
 text_encoder: models/bert-base-uncased

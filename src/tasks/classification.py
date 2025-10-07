@@ -18,13 +18,13 @@ class ClassificationTask(BaseTask):
 
     def training_step(self, batch: Batch, model: ModelModule) -> Dict[str, torch.Tensor]:
         out = model(**batch.inputs)
-        loss = self._criterion(out, batch.outputs["labels"])
+        loss = self._criterion(out, batch.outputs["label"])
         return {"train/loss": loss, "logs": {"train/loss": loss.item()}}
 
     def validation_step(self, batch: Batch, model: ModelModule) -> Dict[str, torch.Tensor]:
         out = model(**batch.inputs)
-        loss = self._criterion(out, batch.outputs["labels"])
-        self.metrics.update(out, batch.outputs["labels"])       
+        loss = self._criterion(out, batch.outputs["label"])
+        self.metrics.update(out, batch.outputs["label"])       
         return {"val/loss": loss}
 
     def reduce(self) -> Dict[str, float]:

@@ -1,6 +1,6 @@
 defaults:
   - data: icnale
-  - model: crossmodal
+  - model: icnale
   - task: classification
   - train: base
   - eval: base

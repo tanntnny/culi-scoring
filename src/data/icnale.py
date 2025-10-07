@@ -17,8 +17,8 @@ import pandas as pd
 
 from ..interfaces.protocol import DataModule
 from ..interfaces.data import Sample, Batch
+from ..interfaces.artifacts import load_artifact, get_supported_artifacts
 from ..core.registry import register
-from ..core.io import load_checkpoint
 from ..core.distributed import is_dist
 
 # ---------------- Label Mapping ----------------
@@ -31,6 +31,7 @@ label_mapping = {
 }
 
 # ---------------- Collate Function ----------------
+
 def collate_fn(batch: List[Sample]) -> Batch:
     batched = Batch(inputs={}, outputs={}, meta={})
 
@@ -80,11 +81,22 @@ class MultimodalDataset(Dataset):
             for feat in features:
                 path = row[feat]
                 try:
-                    if feat == "encoded":
-                        tensor_data = load_checkpoint(path)
+                    # Load artifact using standardized loaders
+                    artifact = load_artifact(feat, path)
+                    
+                    # Extract tensors based on artifact type
+                    if feat == "tokens":
+                        inputs["tokens"] = artifact.input_ids
+                        inputs["tokens_mask"] = artifact.attention_mask
+                    elif feat == "encoded":
+                        inputs["encoded"] = artifact.input_values
+                        if artifact.attention_mask is not None:
+                            inputs["encoded_mask"] = artifact.attention_mask
+                    elif feat == "logmel":
+                        inputs["logmel"] = artifact.spectrogram
                     else:
-                        tensor_data = torch.load(path)
-                    inputs[feat] = tensor_data
+                        raise ValueError(f"Unsupported feature type: {feat}")
+                        
                 except Exception as e:
                     raise ValueError(f"Failed to load {feat} from {path}: {e}")
                     
@@ -113,8 +125,8 @@ class ICNALEDataModule(DataModule):
             raise ValueError("Please specify at least one feature in cfg.data.features")
         
         for feat in cfg.data.features:
-            if feat not in ["encoded", "tokens", "logmel"]:
-                raise ValueError(f"Unsupported feature: {feat}. Supported features are ['encoded', 'tokens', 'logmel']")
+            if feat not in get_supported_artifacts():
+                raise ValueError(f"Unsupported feature: {feat}. Supported features are {get_supported_artifacts()}")
 
         self.cfg = cfg
 
@@ -170,7 +182,7 @@ class ICNALEDataModule(DataModule):
                 self.test_dataset,
                 shuffle=False,
                 drop_last=False,
-            )  # Fix: Add missing parenthesis
+            )
         return DataLoader(
             dataset=self.test_dataset,
             batch_size=self.cfg.train.batch,
