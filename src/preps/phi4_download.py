@@ -14,7 +14,7 @@ class Phi4Downloader(BaseDownloader):
 
     def download(self):
         print("Downloading the Phi-4 model and processor ...")
-        save_root = Path(self.cfg.download.save) / "phi4"
+        save_root = Path(self.cfg.download.save)
         save_root.mkdir(parents=True, exist_ok=True)
 
         repo_id = self.cfg.download.model  # e.g. "microsoft/Phi-4-multimodal-instruct"
@@ -37,6 +37,16 @@ class Phi4Downloader(BaseDownloader):
             trust_remote_code=True
         )
         processor.save_pretrained(processor_dir)
+
+        for attr in ("audio_tokenizer", "image_tokenizer", "tokenizer"):
+            if not hasattr(processor, attr):
+                setattr(processor, attr, None)
+        if not hasattr(processor, "feature_extractor"):
+            setattr(processor, "feature_extractor", None)
+        if not hasattr(processor, "image_processor"):
+            setattr(processor, "image_processor", None)
+        if not hasattr(processor, "processor"):
+            setattr(processor, "processor", None)
 
         print(f"Download complete.\n- Model files: {model_dir}\n- Processor:   {processor_dir}")
 
