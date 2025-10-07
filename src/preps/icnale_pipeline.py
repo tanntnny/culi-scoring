@@ -123,6 +123,7 @@ class ICNALEPipeline(BasePipeline):
             train_df.to_csv(save / f"fold_{fold}_train.csv", index=False)
             val_df.to_csv(save / f"fold_{fold}_val.csv", index=False)
             print(f"Fold {fold}: Train size {len(train_df)}, Val size {len(val_df)}")
+        print(f"ICNALE preprocessing completed.")
 
 
 @register("pipeline", "icnale")
