@@ -21,7 +21,7 @@ class Phi4Downloader(BaseDownloader):
             self.cfg.download.model,
             trust_remote_code=True,
             torch_dtype="auto",
-            device_map="auto"
+            device_map="cpu"
         )
         processor = AutoProcessor.from_pretrained(self.cfg.download.model)
         print("Model loaded:", model.config.model_type)
