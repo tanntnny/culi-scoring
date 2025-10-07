@@ -16,6 +16,7 @@ class Phi4Downloader(BaseDownloader):
     def download(self):
         print(f"Downloading the Phi-4 model and processor ...")
         save = Path(self.cfg.download.save)
+        save.mkdir(parents=True, exist_ok=True)
         model = AutoModelForCausalLM.from_pretrained(
             self.cfg.download.model,
             torch_dtype="auto",

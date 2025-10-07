@@ -23,10 +23,14 @@ class ICNALEDownloader(BaseDownloader):
         save = Path(self.cfg.download.save)
         os.makedirs(save, exist_ok=True)
 
-        Wav2Vec2Model.from_pretrained(self.cfg.download.wav2vec2, use_safetensors=True).save_pretrained(save / "wav2vec2-model")
-        Wav2Vec2Processor.from_pretrained(self.cfg.download.wav2vec2, use_safetensors=True).save_pretrained(save / "wav2vec2-processor")
-        BertModel.from_pretrained(self.cfg.download.bert, use_safetensors=True).save_pretrained(save / "bert-model")
-        BertTokenizer.from_pretrained(self.cfg.download.tokenizer, use_safetensors=True).save_pretrained(save / "bert-tokenizer")
+        Wav2Vec2Model.from_pretrained(self.cfg.download.wav2vec2, use_safetensors=True) \
+            .save_pretrained(save / "wav2vec2" / "wav2vec2-model")
+        Wav2Vec2Processor.from_pretrained(self.cfg.download.wav2vec2, use_safetensors=True) \
+            .save_pretrained(save / "wav2vec2" / "wav2vec2-processor")
+        BertModel.from_pretrained(self.cfg.download.bert, use_safetensors=True) \
+            .save_pretrained(save / "bert" / "bert-model")
+        BertTokenizer.from_pretrained(self.cfg.download.tokenizer, use_safetensors=True) \
+            .save_pretrained(save / "bert" / "bert-tokenizer")
 
         print(f"Download complete.")
 
