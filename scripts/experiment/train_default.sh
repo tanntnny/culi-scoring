@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #SBATCH --job-name=train
 
 #SBATCH --partition=gpu-limited
