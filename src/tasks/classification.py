@@ -3,11 +3,9 @@ from typing import Dict
 import torch
 import torch.nn as nn
 
-from .base import BaseTask
-
-from ..models.base import ModelModule
+from ..interfaces.protocol import BaseTask, ModelModule
 from ..metrics.classification import ConfusionMatrix
-from ..utils.batch import Batch
+from ..interfaces.batch import Batch
 
 # ---------------- Classification Task ----------------
 class ClassificationTask(BaseTask):

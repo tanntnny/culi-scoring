@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..registry import register
+from ..core.registry import register
 
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR

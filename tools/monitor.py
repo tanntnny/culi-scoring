@@ -88,7 +88,7 @@ def main() -> int:
     parser.add_argument(
         "--n",
         type=int,
-        default=1,
+        default=3,
         help="How many files per extension to show."
     )
     parser.add_argument(

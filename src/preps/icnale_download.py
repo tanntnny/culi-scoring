@@ -10,8 +10,8 @@ from transformers import (
     BertTokenizer,
 )
 
-from .base import BaseDownloader
-from ..registry import register
+from ..interfaces.protocol import BaseDownloader
+from ..core.registry import register
 
 # ---------------- Downloader ----------------
 class ICNALEDownloader(BaseDownloader):

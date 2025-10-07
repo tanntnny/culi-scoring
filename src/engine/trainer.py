@@ -1,9 +1,9 @@
 from __future__ import annotations
 from pathlib import Path
 import torch
-from ..registry import build
-from ..utils.logging import Logger
-from ..utils.distributed import init_distributed_if_needed, is_global_zero
+from ..core.registry import build
+from ..core.logging import Logger
+from ..core.distributed import init_distributed_if_needed, is_global_zero
 from .loop import train_one_epoch, validate
 
 class Trainer:

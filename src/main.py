@@ -6,10 +6,13 @@ from .engine.trainer import Trainer
 from .engine.evaluator import Evaluator
 from .preps.pipeline import run_pipeline
 from .preps.download import run_download
-from .utils.seed import seed_everything
+from .core.seed import seed_everything
+from .core import discover
 
 @hydra.main(version_base=None, config_path="../configs", config_name="defaults")
 def main(cfg: DictConfig) -> None:
+    discover.discover_default()
+    
     os.environ.setdefault("PROJECT_ROOT", os.getcwd())
     seed_everything(cfg.get("seed", 42))
     cmd = cfg.get("cmd", "train")

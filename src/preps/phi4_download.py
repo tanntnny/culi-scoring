@@ -4,8 +4,8 @@ from pathlib import Path
 from huggingface_hub import snapshot_download
 import shutil
 
-from .base import BaseDownloader
-from ..registry import register
+from ..interfaces.protocol import BaseDownloader
+from ..core.registry import register
 
 PROCESSOR_FILES = {
     "processor_config.json",
@@ -50,8 +50,8 @@ class Phi4Downloader(BaseDownloader):
                 copied += 1
 
         print(f"Download complete.")
-        print(f"- Model files: {model_dir}")
-        print(f"- Processor:   {processor_dir} (copied {copied} files)")
+        print(f"    - Model files: {model_dir}")
+        print(f"    - Processor:   {processor_dir} (copied {copied} files)")
 
 @register("downloader", "phi4")
 def build_phi4_downloader(cfg):

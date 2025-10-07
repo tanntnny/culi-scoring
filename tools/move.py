@@ -98,13 +98,13 @@ def move_folder(src: Path, dst: Path, *, overwrite: bool, verbose: bool, dry_run
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Move a whole folder safely.")
-    ap.add_argument("src", help="Source folder")
-    ap.add_argument("dst", help="Destination path or directory")
-    ap.add_argument("--overwrite", action="store_true", help="Replace existing destination")
-    ap.add_argument("--dry-run", action="store_true", help="Show what would happen, do not modify")
-    ap.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
-    args = ap.parse_args(argv)
+    parser = argparse.ArgumentParser(description="Move a whole folder safely.")
+    parser.add_argument("src", help="Source folder")
+    parser.add_argument("dst", help="Destination path or directory")
+    parser.add_argument("--overwrite", action="store_true", help="Replace existing destination")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would happen, do not modify")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
+    args = parser.parse_args(argv)
 
     try:
         src, dst = resolve_paths(args.src, args.dst)

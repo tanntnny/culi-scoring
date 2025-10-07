@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..registry import build
+from ..core.registry import build
 
 from .icnale_pipeline import build_icnale_pipeline
 

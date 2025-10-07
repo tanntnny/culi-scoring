@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from .base import Metric
+from ..interfaces.protocol import Metric
 
 class ConfusionMatrix(Metric):
     def __init__(self):

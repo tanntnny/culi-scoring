@@ -1,9 +1,9 @@
 from __future__ import annotations
 from pathlib import Path
 import torch
-from ..registry import build
-from ..utils.logging import Logger
-from ..utils.io import load_checkpoint
+from ..core.registry import build
+from ..core.logging import Logger
+from ..core.io import load_checkpoint
 
 class Evaluator:
     def __init__(self, cfg):

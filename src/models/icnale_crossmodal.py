@@ -6,13 +6,13 @@ import torch.nn as nn
 
 from transformers import Wav2Vec2Model, BertModel
 
-from .base import ModelModule
 
 from .attentions import CrossModalBlock
 from .poolers import AttentionPooler, MeanPooler
 from .encoders import PositionalEncoder
 
-from ..registry import register
+from ..interfaces.protocol import ModelModule
+from ..core.registry import register
 
 # ---------------- Cross-Modal Scorer ----------------
 class CrossModalScorer(nn.Module):

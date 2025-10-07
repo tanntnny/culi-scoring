@@ -11,9 +11,9 @@ from transformers import BertTokenizer, Wav2Vec2Processor
 import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold
 
-from .base import BasePipeline
-from ..registry import register
-from ..utils.io import save_checkpoint
+from ..interfaces.protocol import BasePipeline
+from ..core.registry import register
+from ..core.io import save_checkpoint
 
 from .icnale_helpers import get_valid_files, get_id_from_icnale, get_label_from_icnale
 

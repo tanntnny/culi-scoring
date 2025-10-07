@@ -9,15 +9,14 @@ Configuration
 
 from pathlib import Path
 
-from .base import DataModule
-
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.distributed import DistributedSampler
 import pandas as pd
 
-from ..registry import register
-from ..utils.io import load_checkpoint
-from ..utils.distributed import is_dist
+from ..interfaces import DataModule
+from ..core.registry import register
+from ..core.io import load_checkpoint
+from ..core.distributed import is_dist
 
 # ---------------- Label Mapping ----------------
 
@@ -65,7 +64,8 @@ class ICNALEDataModule(DataModule):
     def __init__(self, cfg):
         train_src = cfg.data.train
         val_src = cfg.data.val
-        test_src = cfg.data.test
+        test_src = cfg.data.get("test", None)
+        variant = cfg.data.get("variant", ["embeddings", "tokens", "logmel"]) # list of "embeddings" | "tokens" | "logmel"
         
         self.train_dataset = MultimodalModalDataset(train_src)
         self.val_dataset = MultimodalModalDataset(val_src)
