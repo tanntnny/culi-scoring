@@ -50,7 +50,7 @@ class HuggingFaceDownloader(BaseDownloader):
         base_save_dir = Path(self.cfg.download.get('save_dir', 'models'))
         base_save_dir.mkdir(parents=True, exist_ok=True)
         
-        for item in self.cfg.download.items:
+        for item in self.cfg.download.get("items", []):
             self._download_item(item, base_save_dir)
         
         print("All downloads completed!")
