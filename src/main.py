@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from .engine.trainer import Trainer
 from .engine.evaluator import Evaluator
 from .pipeline.pipeline import run_pipeline
@@ -18,10 +18,8 @@ def main(cfg: DictConfig) -> None:
     cmd = cfg.get("cmd", "train")
     
     print("Configuration:")
-    print(cfg.pretty())
+    print(OmegaConf.to_yaml(cfg))
     
-    return
-
     if cmd == "train":
         Trainer(cfg).fit()
     elif cmd == "eval":

@@ -195,6 +195,6 @@ class ICNALEDataModule(DataModule):
 
 # ---------------- Register ----------------
 @register("data", "icnale")
-def build_icnale(cfg) -> DataModule:
+def build_icnale(cfg):
     datamodule = ICNALEDataModule(cfg)
     return datamodule

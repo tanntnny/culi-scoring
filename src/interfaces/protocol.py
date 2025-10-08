@@ -11,7 +11,6 @@ Usage:
 
 from __future__ import annotations
 from typing import Protocol, Optional, Dict, Any
-from abc import ABC, abstractmethod
 
 import torch
 import torch.nn as nn
@@ -42,7 +41,7 @@ class DataModule(Protocol):
 # Model Protocols
 # ============================================================================
 
-class ModelModule(nn.Module, Protocol):
+class ModelModule(Protocol):
     """Protocol for model modules that can be used in the training framework."""
     
     def forward(self, *args, **kwargs) -> Any:
