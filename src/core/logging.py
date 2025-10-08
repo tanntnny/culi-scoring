@@ -1,8 +1,13 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any
+
+from omegaconf import DictConfig, OmegaConf
+
 from torch.utils.tensorboard import SummaryWriter
+
 from .distributed import is_global_zero
 
 @dataclass
@@ -24,3 +29,8 @@ class Logger:
     def close(self):
         if self._tb is not None:
             self._tb.close()
+
+def print_cfg(cfg: DictConfig):
+    """Pretty print configuration"""
+    print("Configuration:")
+    print(OmegaConf.to_yaml(cfg))
