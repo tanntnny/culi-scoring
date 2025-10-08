@@ -51,7 +51,7 @@ def discover_packages(package_root: str = "src", package_names: Optional[Iterabl
 
 
 def discover_default() -> List[str]:
-    default_pkgs = ("data", "models", "optim", "preps", "tasks", "metrics")
+    default_pkgs = ("data", "models", "optim", "pipeline", "downloads", "tasks", "metrics")
     return discover_packages("src", default_pkgs)
 
 

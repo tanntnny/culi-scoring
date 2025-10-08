@@ -16,7 +16,9 @@ def main(cfg: DictConfig) -> None:
     os.environ.setdefault("PROJECT_ROOT", os.getcwd())
     seed_everything(cfg.get("seed", 42))
     cmd = cfg.get("cmd", "train")
-    print_cfg(cfg)
+    
+    if cfg.get("verbose", False):
+        print_cfg(cfg)
     
     if cmd == "train":
         Trainer(cfg).fit()
