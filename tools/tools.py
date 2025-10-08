@@ -17,7 +17,7 @@ def main():
     
     print("Available commands:")
     for cmd, desc in _useful_commands:
-        print(f"  {cmd}\n    - {desc}")
+        print(f"  \"{cmd}\"\n    - {desc}")
 
 if __name__ == "__main__":
     main()
