@@ -1,11 +1,11 @@
 from __future__ import annotations
 import os
 import hydra
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from .engine.trainer import Trainer
 from .engine.evaluator import Evaluator
-from .preps.pipeline import run_pipeline
-from .preps.download import run_download
+from .pipeline.pipeline import run_pipeline
+from .downloads.download import run_download
 from .core.seed import seed_everything
 from .core import discover
 
@@ -16,6 +16,11 @@ def main(cfg: DictConfig) -> None:
     os.environ.setdefault("PROJECT_ROOT", os.getcwd())
     seed_everything(cfg.get("seed", 42))
     cmd = cfg.get("cmd", "train")
+    
+    print("Configuration:")
+    print(cfg.pretty())
+    
+    return
 
     if cmd == "train":
         Trainer(cfg).fit()
