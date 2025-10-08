@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 from typing import Protocol, Optional, Dict, Any
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -233,4 +234,4 @@ class Logger(Protocol):
 ConfigDict = Dict[str, Any]
 MetricsDict = Dict[str, float] 
 LossDict = Dict[str, torch.Tensor]
-PathLike = str | torch.PathLike
+PathLike = str | Path
