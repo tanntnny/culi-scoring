@@ -1,0 +1,9 @@
+name: hf
+save_dir: models/
+
+items:
+  - name: wav2vec2-conformer
+    repo: facebook/wav2vec2-conformer-rel-pos-large
+    type: model
+    revision: main
+    save: wav2vec2-conformer
