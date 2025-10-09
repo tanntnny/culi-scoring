@@ -65,6 +65,8 @@ def pick(files: List[Path], n: int, select: str) -> List[Path]:
 def human_time(ts: float) -> str:
     return dt.datetime.fromtimestamp(ts).isoformat(sep=" ", timespec="seconds")
 
+_printable = [".out", ".log", ".txt"]
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Monitor recent/oldest files under paths by extension.")
     parser.add_argument(
@@ -100,6 +102,11 @@ def main() -> int:
         "--until",
         type=parse_time,
         help="Only include files modified before this time."
+    )
+    parser.add_argument(
+        "--cat", "-c",
+        action="store_true",
+        help="Print the contents of the listed files."
     )
     args = parser.parse_args()
 
@@ -146,8 +153,17 @@ def main() -> int:
             try:
                 mtime = path.stat().st_mtime
                 print(f"{args.select.title()} {ext} in {src_str} #{i}: {path}  (mtime: {human_time(mtime)})")
+                if args.cat and ext in _printable:
+                    try:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            print(f"-------- {path} --------")
+                            print(f.read())
+                    except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
+                        print(f"<Error reading file: {e}>")
             except (FileNotFoundError, PermissionError):
                 print(f"{args.select.title()} {ext} in {src_str} #{i}: {path}  (mtime: <unavailable>)")
+                if args.cat:
+                    print("<File unavailable>")
     return 0
 
 if __name__ == "__main__":
