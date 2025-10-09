@@ -108,33 +108,46 @@ class MultimodalDataset(Dataset):
             meta = {}
 
             if row["label"] not in label_mapping:
-                raise ValueError(f"Unknown label: {row['label']}")
+                continue  # skip unknown label
 
+            valid = True
             for feat in features:
                 path = row[feat]
                 try:
-                    # Load artifact using standardized loaders
                     artifact = load_artifact(feat, path)
-                    
                     # Extract tensors based on artifact type
                     if feat == "tokens":
-                        inputs["tokens"] = artifact.input_ids
-                        inputs["tokens_mask"] = artifact.attention_mask
+                        t = artifact.input_ids
+                        m = artifact.attention_mask
+                        if t is None or t.numel() == 0 or m is None or m.numel() == 0:
+                            valid = False
+                            break
+                        inputs["tokens"] = t
+                        inputs["tokens_mask"] = m
                     elif feat == "encoded":
-                        inputs["encoded"] = artifact.input_values
-                        if artifact.attention_mask is not None:
-                            inputs["encoded_mask"] = artifact.attention_mask
-                        else:
-                            seq_len = artifact.input_values.shape[-1] if artifact.input_values.dim() > 1 else artifact.input_values.shape[0]
-                            inputs["encoded_mask"] = torch.ones(artifact.input_values.shape[:-1], dtype=torch.bool)
+                        t = artifact.input_values
+                        m = artifact.attention_mask if artifact.attention_mask is not None else torch.ones(artifact.input_values.shape[:-1], dtype=torch.bool)
+                        if t is None or t.numel() == 0 or m is None or m.numel() == 0:
+                            valid = False
+                            break
+                        inputs["encoded"] = t
+                        inputs["encoded_mask"] = m
                     elif feat == "logmel":
-                        inputs["logmel"] = artifact.spectrogram
+                        t = artifact.spectrogram
+                        if t is None or t.numel() == 0:
+                            valid = False
+                            break
+                        inputs["logmel"] = t
                     else:
-                        raise ValueError(f"Unsupported feature type: {feat}")
-                        
-                except Exception as e:
-                    raise ValueError(f"Failed to load {feat} from {path}: {e}")
-                    
+                        valid = False
+                        break
+                except Exception:
+                    valid = False
+                    break
+
+            if not valid:
+                continue  # skip sample with empty/improper tensor
+
             outputs["label"] = torch.tensor(label_mapping[row["label"]], dtype=torch.long)
             meta["id"] = row.get("id", None)
 
