@@ -6,6 +6,7 @@ import torch.nn as nn
 from ..interfaces.protocol import BaseTask, ModelModule
 from ..metrics.classification import ConfusionMatrix
 from ..interfaces.data import Batch
+from ..core.registry import register
 
 # ---------------- Classification Task ----------------
 class ClassificationTask(BaseTask):
@@ -31,3 +32,7 @@ class ClassificationTask(BaseTask):
         metrics = self.metrics.compute()
         self.metrics.reset()
         return metrics
+
+@register("task", "classification")
+def build_classification_task(cfg):
+    return ClassificationTask(cfg)
