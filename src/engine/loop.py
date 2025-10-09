@@ -6,7 +6,6 @@ from torch.nn.utils import clip_grad_norm_
 
 def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad_accum, clip_grad, logger, global_step_start=0, log_every_n=50):
     model.train();
-    task.metrics.reset()
     scaler = torch.cuda.amp.GradScaler(enabled=(amp == "fp16"))
     autocast = (torch.autocast(device_type="cuda", dtype=torch.bfloat16) if amp=="bf16" else
                 torch.autocast(device_type="cuda", dtype=torch.float16) if amp=="fp16" else
@@ -43,7 +42,6 @@ def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad
 
 def validate(model, task, loader, device, logger, global_step):
     model.eval()
-    task.metrics.reset()
     total_loss = 0.0; n = 0
     with torch.no_grad():
         for batch in loader:

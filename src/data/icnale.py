@@ -32,6 +32,36 @@ label_mapping = {
 
 # ---------------- Collate Function ----------------
 
+def pad_audio_features(tensors):
+    """Pad audio features to same dimensions"""
+    if len(tensors) == 0:
+        return torch.empty(0)
+    
+    # Find max dimensions
+    max_len = max(t.shape[0] for t in tensors)
+    max_features = max(t.shape[1] for t in tensors) if len(tensors[0].shape) > 1 else 1
+    
+    # Pad all tensors to max dimensions
+    padded = []
+    for tensor in tensors:
+        if len(tensor.shape) == 1:
+            tensor = tensor.unsqueeze(1)
+        
+        # Pad length (time dimension)
+        if tensor.shape[0] < max_len:
+            pad_len = max_len - tensor.shape[0]
+            tensor = torch.nn.functional.pad(tensor, (0, 0, 0, pad_len))
+        
+        # Pad features dimension if needed
+        if tensor.shape[1] < max_features:
+            pad_features = max_features - tensor.shape[1]
+            tensor = torch.nn.functional.pad(tensor, (0, pad_features))
+        
+        padded.append(tensor)
+    
+    return torch.stack(padded)
+
+
 def collate_fn(batch: List[Sample]) -> Batch:
     batched = Batch(inputs={}, outputs={}, meta={})
 
@@ -39,18 +69,37 @@ def collate_fn(batch: List[Sample]) -> Batch:
     for key in input_keys:
         tensors = [sample.inputs[key] for sample in batch]
         if all(isinstance(t, torch.Tensor) for t in tensors):
-            # Always use padding for input sequences
-            if key in ["tokens", "encoded", "logmel"]:  # Known sequence types
-                batched.inputs[key] = torch.nn.utils.rnn.pad_sequence(
-                    tensors, batch_first=True, padding_value=0
-                )
-            else:
-                try:
-                    batched.inputs[key] = torch.stack(tensors)
-                except:
+            # Check if all tensors have same shape (except first dimension)
+            if len(tensors) > 1:
+                shapes = [t.shape[1:] for t in tensors]
+                if len(set(shapes)) == 1:
+                    # Same shape - can use pad_sequence
                     batched.inputs[key] = torch.nn.utils.rnn.pad_sequence(
-                        tensors, batch_first=True, padding_value=0
+                        tensors, batch_first=True, padding_value=0.0
                     )
+                else:
+                    # Different shapes - need custom handling
+                    if key in ["encoded", "logmel"]:  # Audio features
+                        batched.inputs[key] = pad_audio_features(tensors)
+                    elif key == "tokens":  # Text tokens - should have same feature dim
+                        batched.inputs[key] = torch.nn.utils.rnn.pad_sequence(
+                            tensors, batch_first=True, padding_value=0
+                        )
+                    else:
+                        # Fallback: try stack, then pad_sequence, then custom padding
+                        try:
+                            batched.inputs[key] = torch.stack(tensors)
+                        except RuntimeError:
+                            try:
+                                batched.inputs[key] = torch.nn.utils.rnn.pad_sequence(
+                                    tensors, batch_first=True, padding_value=0.0
+                                )
+                            except RuntimeError:
+                                print(f"Warning: Using custom padding for {key}")
+                                batched.inputs[key] = pad_audio_features(tensors)
+            else:
+                # Single tensor
+                batched.inputs[key] = tensors[0].unsqueeze(0)
         else:
             batched.inputs[key] = tensors
 
