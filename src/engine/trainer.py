@@ -16,7 +16,7 @@ class Trainer:
         self.model = build("model", cfg.model.name, cfg=cfg).to(self.device)
         self.task = build("task", cfg.task.name, cfg=cfg)
         self.task.setup(self.model)
-        self.optimizer, self.scheduler = build("optimizer", cfg.train.optimizer, cfg=cfg)
+        self.optimizer, self.scheduler = build("optimizer", cfg.train.optimizer, cfg=cfg, model=self.model)
         self.logger = Logger(Path(cfg.output_dir) / "tb")
         self.global_step = 0
 
