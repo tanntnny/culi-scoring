@@ -13,7 +13,7 @@ class ClassificationTask(BaseTask):
     def __init__(self, cfg):
         self.cfg = cfg
 
-    def setup(self, model: ModelModule) -> None:
+    def setup(self) -> None:
         self._criterion = nn.CrossEntropyLoss()
         self.metrics = ConfusionMatrix()
 
