@@ -33,7 +33,7 @@ class Trainer:
             if val_loader is not None:
                 metrics = validate(self.model, self.task, val_loader, self.device, self.logger, self.global_step)
                 # Naive checkpointing
-                ckpt_path = Path(self.cfg.train.checkpoint.dir) / f"epoch{epoch:03d}.pt"
+                ckpt_path = Path(self.cfg.output_dir) / "checkpoints" / f"epoch{epoch:03d}.pt"
                 if is_global_zero():
                     ckpt_path.parent.mkdir(parents=True, exist_ok=True)
                     torch.save({
