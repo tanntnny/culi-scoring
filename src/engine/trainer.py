@@ -9,7 +9,7 @@ from .loop import train_one_epoch, validate
 class Trainer:
     def __init__(self, cfg):
         self.cfg = cfg
-        init_distributed_if_needed(cfg.train.ddp)
+        init_distributed_if_needed(cfg.ddp)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.datamodule = build("data", cfg.data.name, cfg=cfg)
