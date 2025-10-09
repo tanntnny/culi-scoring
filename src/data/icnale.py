@@ -69,12 +69,31 @@ def collate_fn(batch: List[Sample]) -> Batch:
     for key in input_keys:
         tensors = [sample.inputs[key] for sample in batch]
         if all(isinstance(t, torch.Tensor) for t in tensors):
-            # Check if all tensors have batch dimension of 1
-            if all(t.shape[0] == 1 for t in tensors):
+            if any(t.numel() == 0 for t in tensors):
+                raise RuntimeError(f"Encountered empty tensor for input key '{key}'")
+
+            normalized = []
+            for t in tensors:
+                if t.ndim == 0:
+                    t = t.unsqueeze(0)
+                normalized.append(t)
+            tensors = normalized
+
+            if all(t.ndim > 0 and t.shape[0] == 1 for t in tensors):
                 tensors = [t.squeeze(0) for t in tensors]
-            batched.inputs[key] = torch.nn.utils.rnn.pad_sequence(
-                tensors, batch_first=True, padding_value=0.0
-            )
+
+            pad_value = 0 if tensors[0].dtype == torch.bool else 0.0
+
+            try:
+                batched.inputs[key] = torch.nn.utils.rnn.pad_sequence(
+                    tensors, batch_first=True, padding_value=pad_value
+                )
+            except RuntimeError as err:
+                shapes = [tuple(t.shape) for t in tensors]
+                dtypes = [str(t.dtype) for t in tensors]
+                raise RuntimeError(
+                    f"Failed to pad tensors for '{key}'. Shapes: {shapes}, dtypes: {dtypes}"
+                ) from err
         else:
             batched.inputs[key] = tensors
 
@@ -119,24 +138,68 @@ class MultimodalDataset(Dataset):
                     if feat == "tokens":
                         t = artifact.input_ids
                         m = artifact.attention_mask
-                        if t is None or t.numel() == 0 or m is None or m.numel() == 0:
+                        if (
+                            not isinstance(t, torch.Tensor)
+                            or not isinstance(m, torch.Tensor)
+                            or t.numel() == 0
+                            or m.numel() == 0
+                            or t.ndim == 0
+                            or m.ndim == 0
+                        ):
+                            valid = False
+                            break
+                        if t.ndim > 1 and t.shape[0] == 1:
+                            t = t.squeeze(0)
+                        if m.ndim > 1 and m.shape[0] == 1:
+                            m = m.squeeze(0)
+                        if t.shape != m.shape:
                             valid = False
                             break
                         inputs["tokens"] = t
                         inputs["tokens_mask"] = m
                     elif feat == "encoded":
                         t = artifact.input_values
-                        m = artifact.attention_mask if artifact.attention_mask is not None else torch.ones(artifact.input_values.shape[:-1], dtype=torch.bool)
-                        if t is None or t.numel() == 0 or m is None or m.numel() == 0:
+                        m = artifact.attention_mask
+                        if not isinstance(t, torch.Tensor) or t.numel() == 0 or t.ndim == 0:
                             valid = False
                             break
+                        if m is None:
+                            m = torch.ones_like(t, dtype=torch.bool)
+                        elif (
+                            not isinstance(m, torch.Tensor)
+                            or m.numel() == 0
+                            or m.ndim == 0
+                        ):
+                            valid = False
+                            break
+                        if t.ndim > 1 and t.shape[0] == 1:
+                            t = t.squeeze(0)
+                        if m.ndim > 1 and m.shape[0] == 1:
+                            m = m.squeeze(0)
+                        if m.shape != t.shape:
+                            if m.ndim == 1 and t.ndim == 2 and t.shape[0] == m.shape[0]:
+                                m = m.unsqueeze(1).expand_as(t)
+                            elif m.ndim == 2 and t.ndim == 1 and m.shape[0] == 1 and m.shape[1] == t.shape[0]:
+                                m = m.squeeze(0)
+                                if m.shape != t.shape:
+                                    valid = False
+                                    break
+                            else:
+                                valid = False
+                                break
                         inputs["encoded"] = t
                         inputs["encoded_mask"] = m
                     elif feat == "logmel":
                         t = artifact.spectrogram
-                        if t is None or t.numel() == 0:
+                        if (
+                            not isinstance(t, torch.Tensor)
+                            or t.numel() == 0
+                            or t.ndim == 0
+                        ):
                             valid = False
                             break
+                        if t.ndim > 2 and t.shape[0] == 1:
+                            t = t.squeeze(0)
                         inputs["logmel"] = t
                     else:
                         valid = False
