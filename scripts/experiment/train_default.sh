@@ -15,10 +15,6 @@ module load Mamba/23.11.0-0
 conda activate pytorch-2.2.2
 mkdir -p logs
 
-# Ensure offline mode for transformers and datasets
-export TRANSFORMERS_OFFLINE=1
-export HF_DATASETS_OFFLINE=1
-
 # NCCL and PyTorch distributed settings (fixed deprecated variables)
 export NCCL_DEBUG=WARN
 export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
@@ -35,6 +31,10 @@ export NUMEXPR_NUM_THREADS=$OMP_NUM_THREADS
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_NODELIST" | head -n1)
 export MASTER_PORT=${MASTER_PORT:-$((29500 + SLURM_JOB_ID % 1000))}
 export WORLD_SIZE=$SLURM_NTASKS
+
+# Ensure offline mode for transformers and datasets
+export TRANSFORMERS_OFFLINE=1
+export HF_DATASETS_OFFLINE=1
 
 # Hydra settings
 export HYDRA_FULL_ERROR=1

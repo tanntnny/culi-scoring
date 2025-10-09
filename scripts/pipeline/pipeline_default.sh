@@ -30,6 +30,14 @@ export MKL_NUM_THREADS=$OMP_NUM_THREADS
 export OPENBLAS_NUM_THREADS=$OMP_NUM_THREADS
 export NUMEXPR_NUM_THREADS=$OMP_NUM_THREADS
 
+# Ensure offline mode for transformers and datasets
+export TRANSFORMERS_OFFLINE=1
+export HF_DATASETS_OFFLINE=1
+
+# Hydra settings
+export HYDRA_FULL_ERROR=1
+export HYDRA_ERROR_ON_UNDEFINED_CONFIG=True
+
 # ---------------- DDP Rendezvous ----------------
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n1)
 export MASTER_ADDR

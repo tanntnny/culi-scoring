@@ -22,8 +22,36 @@ from .icnale_helpers import get_valid_files, get_id_from_icnale, get_label_from_
 class ICNALEPipeline(BasePipeline):
     def __init__(self, cfg):
         self.cfg = cfg
-        self.tokenizer = BertTokenizer.from_pretrained(self.cfg.pipeline.tokenizer)
-        self.audio_processor = Wav2Vec2Processor.from_pretrained(self.cfg.pipeline.encoder)
+        print("Initializing ICNALE Pipeline...")
+        print(f"Loading tokenizer: {self.cfg.pipeline.tokenizer}")
+        try:
+            # Try to load from cache first
+            self.tokenizer = BertTokenizer.from_pretrained(
+                self.cfg.pipeline.tokenizer,
+                local_files_only=True
+            )
+            print(f"✓ Loaded tokenizer from cache")
+        except Exception as e:
+            print(f"Failed to load tokenizer from cache: {e}")
+            print("Trying to download...")
+            self.tokenizer = BertTokenizer.from_pretrained(self.cfg.pipeline.tokenizer)
+            print(f"✓ Downloaded tokenizer")
+        
+        print(f"Loading audio processor: {self.cfg.pipeline.encoder}")
+        try:
+            # Try to load from cache first
+            self.audio_processor = Wav2Vec2Processor.from_pretrained(
+                self.cfg.pipeline.encoder,
+                local_files_only=True
+            )
+            print(f"✓ Loaded audio processor from cache")
+        except Exception as e:
+            print(f"Failed to load audio processor from cache: {e}")
+            print("Trying to download...")
+            self.audio_processor = Wav2Vec2Processor.from_pretrained(self.cfg.pipeline.encoder)
+            print(f"✓ Downloaded audio processor")
+        
+        print("Pipeline initialization complete!")
 
     def preprocess_text(self, text: str) -> Dict[str, torch.Tensor]:
         tokens = self.tokenizer(
@@ -65,37 +93,48 @@ class ICNALEPipeline(BasePipeline):
         return encoded, log_mel_spectrogram
 
     def filter_inconsistent_labels(self, files):
-        """Remove files where the same record has multiple different labels"""
-        # Group files by record ID (without label)
-        record_labels = defaultdict(set)
+        """Remove files where the same record has multiple different CEFR labels"""
+        print("Filtering inconsistent labels...")
+        
+        # Group files by base record ID (person + task, no CEFR)
+        record_cefr_labels = defaultdict(set)
         
         for f in files:
             fid = get_id_from_icnale(f)
-            label = get_label_from_icnale(fid)
             
-            # Extract record ID (everything before the label)
-            # For fid like "SM_JPN_PTJ2_090_B1_1", extract "SM_JPN_PTJ2_090_1" 
-            # (removing the CEFR part but keeping task number)
+            # Extract CEFR label from the file ID
+            # For "SM_PHL_PTJ2_062_B2_0" -> CEFR is "B2"
             parts = fid.split('_')
             if len(parts) >= 5:
-                # Reconstruct without CEFR: SM_JPN_PTJ2_090_1
-                record_id = '_'.join(parts[:-2]) + '_' + parts[-1]
-            else:
-                record_id = fid
-            
-            record_labels[record_id].add(label)
+                cefr_part = parts[-2]  # "B2" from ["SM", "PHL", "PTJ2", "062", "B2", "0"]
+                task_num = parts[-1]   # "0" from above
+                
+                # Create base record ID without CEFR: SM_PHL_PTJ2_062_0
+                base_record = '_'.join(parts[:-2]) + '_' + task_num
+                
+                # Extract just the CEFR level (B1, B2, etc.)
+                import re
+                cefr_match = re.match(r'([ABC][12])', cefr_part)
+                if cefr_match:
+                    cefr_level = cefr_match.group(1)
+                    record_cefr_labels[base_record].add(cefr_level)
+                    
+        print(f"Found {len(record_cefr_labels)} unique base records")
         
-        # Find records with multiple labels
-        inconsistent_records = {record_id for record_id, labels 
-                              in record_labels.items() if len(labels) > 1}
+        # Find records with multiple CEFR labels
+        inconsistent_records = {}
+        for base_record, cefr_levels in record_cefr_labels.items():
+            if len(cefr_levels) > 1:
+                inconsistent_records[base_record] = cefr_levels
         
         if inconsistent_records:
-            print(f"\nFound {len(inconsistent_records)} records with inconsistent labels:")
-            for record_id in list(inconsistent_records)[:5]:  # Show first 5
-                labels = record_labels[record_id]
-                print(f"  {record_id}: {labels}")
-            if len(inconsistent_records) > 5:
-                print(f"  ... and {len(inconsistent_records) - 5} more")
+            print(f"\nFound {len(inconsistent_records)} records with inconsistent CEFR labels:")
+            for base_record, cefr_levels in list(inconsistent_records.items())[:10]:
+                print(f"  {base_record}: {cefr_levels}")
+            if len(inconsistent_records) > 10:
+                print(f"  ... and {len(inconsistent_records) - 10} more")
+        else:
+            print("No inconsistent CEFR labels found")
         
         # Filter out files from inconsistent records
         filtered_files = []
@@ -104,22 +143,28 @@ class ICNALEPipeline(BasePipeline):
         for f in files:
             fid = get_id_from_icnale(f)
             parts = fid.split('_')
+            
             if len(parts) >= 5:
-                record_id = '_'.join(parts[:-2]) + '_' + parts[-1]
-            else:
-                record_id = fid
+                task_num = parts[-1]
+                base_record = '_'.join(parts[:-2]) + '_' + task_num
                 
-            if record_id not in inconsistent_records:
-                filtered_files.append(f)
+                if base_record not in inconsistent_records:
+                    filtered_files.append(f)
+                else:
+                    removed_count += 1
+                    print(f"  Removing: {fid} (inconsistent CEFR for {base_record})")
             else:
-                removed_count += 1
+                # Keep files that don't match expected pattern
+                filtered_files.append(f)
         
-        print(f"Removed {removed_count} files due to inconsistent labels")
+        print(f"\nRemoved {removed_count} files due to inconsistent CEFR labels")
         print(f"Remaining files: {len(filtered_files)}")
         
         return filtered_files
 
     def run(self):
+        print("Starting ICNALE pipeline processing...")
+        
         src = Path(self.cfg.pipeline.src)
         save = Path(self.cfg.pipeline.save)
         files = get_valid_files(src)
@@ -128,6 +173,10 @@ class ICNALEPipeline(BasePipeline):
         
         # Filter out files with inconsistent labels
         files = self.filter_inconsistent_labels(files)
+        
+        if len(files) == 0:
+            print("ERROR: No valid files found after filtering!")
+            return
         
         # Create saving folders
         token_folder = save / "text_tokens"
@@ -143,32 +192,74 @@ class ICNALEPipeline(BasePipeline):
         
         processed_count = 0
         failed_count = 0
+        text_files = 0
+        audio_files = 0
         
-        for f in files:
+        # Process files with progress reporting
+        total_files = len(files)
+        print(f"Processing {total_files} files...")
+        
+        for i, f in enumerate(files):
+            # Progress reporting every 50 files
+            if (i + 1) % 50 == 0 or i == 0:
+                print(f"Progress: {i+1}/{total_files} files ({((i+1)/total_files)*100:.1f}%)")
+            
             _, ext = os.path.splitext(f)
             fid = get_id_from_icnale(f)
 
             try:
                 if ext.lower() in [".wav", ".mp3", ".flac", ".m4a"]:
+                    # Validate audio file exists and is readable
+                    if not os.path.exists(f) or os.path.getsize(f) == 0:
+                        print(f"Warning: Skipping empty or missing audio file: {f}")
+                        failed_count += 1
+                        continue
+                        
                     encoded, log_mel_spectrogram = self.preprocess_audio(f)
                     save_checkpoint(audio_folder / f"{fid}_audio.pt", encoded)
                     save_checkpoint(logmel_folder / f"{fid}_logmel.pt", log_mel_spectrogram)
                     processed_count += 1
+                    audio_files += 1
 
                 elif ext.lower() in [".txt"]:
-                    with open(f, 'r', encoding='utf-8') as file:
-                        text = file.read().strip()
-                    tokens = self.preprocess_text(text)
-                    save_checkpoint(token_folder / f"{fid}_token.pt", tokens)
-                    processed_count += 1
+                    # Validate text file exists and is readable
+                    if not os.path.exists(f):
+                        print(f"Warning: Skipping missing text file: {f}")
+                        failed_count += 1
+                        continue
+                        
+                    try:
+                        with open(f, 'r', encoding='utf-8') as file:
+                            text = file.read().strip()
+                        
+                        if not text:
+                            print(f"Warning: Skipping empty text file: {f}")
+                            failed_count += 1
+                            continue
+                            
+                        tokens = self.preprocess_text(text)
+                        save_checkpoint(token_folder / f"{fid}_token.pt", tokens)
+                        processed_count += 1
+                        text_files += 1
+                    except UnicodeDecodeError as e:
+                        print(f"Warning: Unicode decode error in {f}: {e}")
+                        failed_count += 1
+                        continue
                     
             except Exception as e:
                 print(f"Error processing {f}: {e}")
                 failed_count += 1
                 continue
 
-        print(f"Successfully processed: {processed_count}")
-        print(f"Failed to process: {failed_count}")
+        print(f"\nProcessing Summary:")
+        print(f"  Successfully processed: {processed_count}")
+        print(f"    - Audio files: {audio_files}")
+        print(f"    - Text files: {text_files}")
+        print(f"  Failed to process: {failed_count}")
+
+        if processed_count == 0:
+            print("ERROR: No files were successfully processed!")
+            return
 
         # ---------------- KFold Splitting ----------------
         print(f"\nSplitting dataset into K-Folds ...")
@@ -177,8 +268,12 @@ class ICNALEPipeline(BasePipeline):
             fid = get_id_from_icnale(f)
             fids.add(fid)
         
+        print(f"Found {len(fids)} unique file IDs")
+        
         # Create dataframe
         data = []
+        missing_files = {'tokens': 0, 'encoded': 0, 'logmel': 0}
+        
         for fid in fids:
             tokens_path = token_folder / f"{fid}_token.pt"
             encoded_path = audio_folder / f"{fid}_audio.pt"
@@ -190,10 +285,18 @@ class ICNALEPipeline(BasePipeline):
             
             if tokens_path.exists():
                 row['tokens'] = str(tokens_path)
+            else:
+                missing_files['tokens'] += 1
+                
             if encoded_path.exists():
                 row['encoded'] = str(encoded_path)
+            else:
+                missing_files['encoded'] += 1
+                
             if logmel_path.exists():
                 row['logmel'] = str(logmel_path)
+            else:
+                missing_files['logmel'] += 1
             
             # Only add if we have at least one feature
             if len(row) > 3:
@@ -202,21 +305,61 @@ class ICNALEPipeline(BasePipeline):
         df = pd.DataFrame(data)
         print(f"Created dataset with {len(df)} samples")
         
+        if missing_files['tokens'] > 0 or missing_files['encoded'] > 0 or missing_files['logmel'] > 0:
+            print(f"Missing files summary:")
+            for file_type, count in missing_files.items():
+                if count > 0:
+                    print(f"  - {file_type}: {count} missing")
+        
+        if len(df) == 0:
+            print("ERROR: No complete samples found for dataset creation!")
+            return
+        
         # Save full dataframe
         df.to_csv(save / "dataset.csv", index=False)
+        print(f"Saved complete dataset to: {save / 'dataset.csv'}")
         
         # Perform K-Fold Stratified Group Split
         # Use get_group_by_id for proper person-level grouping
         df['person_id'] = df['id'].apply(lambda x: get_group_by_id(x))
         
-        sgkf = StratifiedGroupKFold(n_splits=self.cfg.pipeline.k_folds, shuffle=True, random_state=42)
+        # Check if we have enough unique groups for k-fold
+        unique_groups = df['person_id'].nunique()
+        k_folds = self.cfg.pipeline.k_folds
+        
+        if unique_groups < k_folds:
+            print(f"Warning: Only {unique_groups} unique groups found, but {k_folds} folds requested.")
+            print(f"Reducing to {unique_groups} folds.")
+            k_folds = unique_groups
+        
+        sgkf = StratifiedGroupKFold(n_splits=k_folds, shuffle=True, random_state=42)
+        fold_summary = []
+        
         for fold, (train_idx, val_idx) in enumerate(sgkf.split(df, df["label"], groups=df["person_id"])):
             train_df = df.iloc[train_idx].drop('person_id', axis=1)
             val_df = df.iloc[val_idx].drop('person_id', axis=1)
             train_df.to_csv(save / f"fold_{fold}_train.csv", index=False)
             val_df.to_csv(save / f"fold_{fold}_val.csv", index=False)
+            
+            fold_info = {
+                'fold': fold,
+                'train_size': len(train_df),
+                'val_size': len(val_df),
+                'train_labels': train_df['label'].value_counts().to_dict(),
+                'val_labels': val_df['label'].value_counts().to_dict()
+            }
+            fold_summary.append(fold_info)
+            
             print(f"Fold {fold}: Train size {len(train_df)}, Val size {len(val_df)}")
-        print(f"ICNALE preprocessing completed.")
+            print(f"  Train labels: {dict(train_df['label'].value_counts())}")
+            print(f"  Val labels: {dict(val_df['label'].value_counts())}")
+        
+        print(f"\n✅ ICNALE preprocessing completed successfully!")
+        print(f"   - Total samples: {len(df)}")
+        print(f"   - K-fold splits: {k_folds}")
+        print(f"   - Output directory: {save}")
+        
+        return True
 
 
 @register("pipeline", "icnale")
