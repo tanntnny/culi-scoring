@@ -3,4 +3,4 @@ lr: 1e-4
 weight_decay: 0.01
 epochs: 20
 batch: 4
-num_workers: 4
+num_workers: 8
