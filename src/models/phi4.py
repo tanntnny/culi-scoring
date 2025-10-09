@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoCa
+from transformers import AutoModel, AutoModelForCausalLM
 
 # ---------------- Phi4 ----------------
 
