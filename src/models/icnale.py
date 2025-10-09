@@ -27,11 +27,15 @@ class CrossModalScorer(nn.Module):
     ):
         super().__init__()
         
-        self.audio_encoder = Wav2Vec2Model.from_pretrained(audio_encoder)
+        try: 
+            self.audio_encoder = Wav2Vec2Model.from_pretrained(audio_encoder, local_files_only=True)
+            self.text_encoder = BertModel.from_pretrained(text_encoder, local_files_only=True)
+        except:
+            raise ValueError("Please check the model names or paths for audio_encoder and text_encoder.")
+
         audio_hid_dim = self.audio_encoder.config.hidden_size
         self.audio_positional_encoder = PositionalEncoder(dim_embed=audio_hid_dim, max_len=5_000)
 
-        self.text_encoder = BertModel.from_pretrained(text_encoder)
         text_hid_dim = self.text_encoder.config.hidden_size
         self.text_positional_encoder = PositionalEncoder(dim_embed=text_hid_dim, max_len=5_000)
 

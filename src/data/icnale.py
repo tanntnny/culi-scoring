@@ -39,10 +39,22 @@ def collate_fn(batch: List[Sample]) -> Batch:
     for key in input_keys:
         tensors = [sample.inputs[key] for sample in batch]
         if all(isinstance(t, torch.Tensor) for t in tensors):
-            batched.inputs[key] = torch.stack(tensors)
+            # Always use padding for input sequences
+            if key in ["tokens", "encoded", "logmel"]:  # Known sequence types
+                batched.inputs[key] = torch.nn.utils.rnn.pad_sequence(
+                    tensors, batch_first=True, padding_value=0
+                )
+            else:
+                try:
+                    batched.inputs[key] = torch.stack(tensors)
+                except:
+                    batched.inputs[key] = torch.nn.utils.rnn.pad_sequence(
+                        tensors, batch_first=True, padding_value=0
+                    )
         else:
             batched.inputs[key] = tensors
 
+    # Labels should always be stackable
     output_keys = batch[0].outputs.keys()
     for key in output_keys:
         tensors = [sample.outputs[key] for sample in batch]
@@ -55,10 +67,6 @@ def collate_fn(batch: List[Sample]) -> Batch:
     for key in meta_keys:
         metas = [sample.meta[key] for sample in batch]
         batched.meta[key] = metas
-
-    for k in batched.inputs:
-        if isinstance(batched.inputs[k], list) and all(isinstance(t, torch.Tensor) for t in batched.inputs[k]):
-            batched.inputs[k] = torch.nn.utils.rnn.pad_sequence(batched.inputs[k], batch_first=True, padding_value=0)
 
     return batched
 
