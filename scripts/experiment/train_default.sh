@@ -21,32 +21,26 @@ conda activate pytorch-2.2.2
 
 mkdir -p logs
 
-# NCCL: sane logs + async error handling (avoid deadlocks on failures)
 export NCCL_DEBUG=WARN
 export NCCL_ASYNC_ERROR_HANDLING=1
 export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
-
-# Imports from repo root
 export PYTHONPATH=${PYTHONPATH:-$PWD}
 export PYTHONFAULTHANDLER=1
 
-# CPU threading per rank
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 export MKL_NUM_THREADS=$OMP_NUM_THREADS
 export OPENBLAS_NUM_THREADS=$OMP_NUM_THREADS
 export NUMEXPR_NUM_THREADS=$OMP_NUM_THREADS
 
-# ---------------- DDP Rendezvous ----------------
-MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n1)
-export MASTER_ADDR
+# Master = first host in the allocation; make it visible to all ranks
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_NODELIST" | head -n1)
 export MASTER_PORT=${MASTER_PORT:-29500}
-export WORLD_SIZE=$(( SLURM_NNODES * SLURM_NTASKS_PER_NODE ))
+
+# Map Slurm -> torch.distributed
+export WORLD_SIZE=$SLURM_NTASKS
+export RANK=$SLURM_PROCID
+export LOCAL_RANK=$SLURM_LOCALID
 
 # ---------------- Launch ----------------
 srun --gpu-bind=none \
-  torchrun \
-    --nnodes=${SLURM_NNODES} \
-    --nproc_per_node=${SLURM_NTASKS_PER_NODE} \
-    --rdzv_backend=c10d \
-    --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} \
-    -m src.main cmd=train ddp=True
+    python3 -m src.main cmd=train ddp=True
