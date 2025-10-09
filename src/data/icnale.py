@@ -240,6 +240,12 @@ class ICNALEDataModule(DataModule):
                 raise ValueError(f"Unsupported feature: {feat}. Supported features are {get_supported_artifacts()}")
 
         self.cfg = cfg
+        self.train_dataset = None
+        self.val_dataset = None
+        self.test_dataset = None
+        self.train_sampler: DistributedSampler | None = None
+        self.val_sampler: DistributedSampler | None = None
+        self.test_sampler: DistributedSampler | None = None
 
     def train_dataloader(self):
         sampler = None
@@ -251,11 +257,12 @@ class ICNALEDataModule(DataModule):
                 shuffle=True,
                 drop_last=True,
             )
+        self.train_sampler = sampler
         return DataLoader(
             dataset=self.train_dataset,
             batch_size=self.cfg.train.batch,
-            sampler=sampler,
-            shuffle=(sampler is None),
+            sampler=self.train_sampler,
+            shuffle=(self.train_sampler is None),
             num_workers=self.cfg.train.num_workers,
             pin_memory=True,
             collate_fn=collate_fn,
@@ -271,10 +278,11 @@ class ICNALEDataModule(DataModule):
                 shuffle=False,
                 drop_last=False,
             )
+        self.val_sampler = sampler
         return DataLoader(
             dataset=self.val_dataset,
             batch_size=self.cfg.train.batch,
-            sampler=sampler,
+            sampler=self.val_sampler,
             shuffle=False,
             num_workers=self.cfg.train.num_workers,
             pin_memory=True,
@@ -294,15 +302,24 @@ class ICNALEDataModule(DataModule):
                 shuffle=False,
                 drop_last=False,
             )
+        self.test_sampler = sampler
         return DataLoader(
             dataset=self.test_dataset,
             batch_size=self.cfg.train.batch,
-            sampler=sampler,
+            sampler=self.test_sampler,
             shuffle=False,
             num_workers=self.cfg.train.num_workers,
             pin_memory=True,
             collate_fn=collate_fn,
         )
+
+    def set_epoch(self, epoch: int) -> None:
+        if self.train_sampler is not None:
+            self.train_sampler.set_epoch(epoch)
+        if self.val_sampler is not None:
+            self.val_sampler.set_epoch(epoch)
+        if self.test_sampler is not None:
+            self.test_sampler.set_epoch(epoch)
 
 # ---------------- Register ----------------
 @register("data", "icnale")

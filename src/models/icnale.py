@@ -24,6 +24,7 @@ class CrossModalScorer(nn.Module):
             cross_attn_hid_dim: int = 768,
             lstm_hidden_dim: int = 512,
             dropout: float = 0.0,
+            gradient_checkpointing: bool = False,
     ):
         super().__init__()
         
@@ -32,6 +33,16 @@ class CrossModalScorer(nn.Module):
             self.text_encoder = BertModel.from_pretrained(text_encoder, local_files_only=True)
         except:
             raise ValueError("Please check the model names or paths for audio_encoder and text_encoder.")
+
+        if gradient_checkpointing:
+            if hasattr(self.audio_encoder, "gradient_checkpointing_enable"):
+                self.audio_encoder.gradient_checkpointing_enable()
+            if hasattr(self.text_encoder, "gradient_checkpointing_enable"):
+                self.text_encoder.gradient_checkpointing_enable()
+            if hasattr(self.audio_encoder.config, "use_cache"):
+                self.audio_encoder.config.use_cache = False
+            if hasattr(self.text_encoder.config, "use_cache"):
+                self.text_encoder.config.use_cache = False
 
         audio_hid_dim = self.audio_encoder.config.hidden_size
         self.audio_positional_encoder = PositionalEncoder(dim_embed=audio_hid_dim, max_len=5_000)
@@ -113,5 +124,6 @@ def build_icnale(cfg) -> ModelModule:
         cfg.model.cross_attn_hid_dim,
         cfg.model.lstm_hidden_dim,
         cfg.model.dropout,
+        getattr(cfg.model, "gradient_checkpointing", False),
     )
     return model

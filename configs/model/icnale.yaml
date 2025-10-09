@@ -5,3 +5,4 @@ text_encoder: models/bert/bert-model
 cross_attn_hid_dim: 768
 lstm_hidden_dim: 512
 dropout: 0.1
+gradient_checkpointing: true

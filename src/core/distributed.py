@@ -29,6 +29,11 @@ def barrier():
     if is_dist():
         dist.barrier()
 
+
+def cleanup_distributed():
+    if is_dist():
+        dist.destroy_process_group()
+
 @contextmanager
 def maybe_distributed_zero_first():
     if is_global_zero():

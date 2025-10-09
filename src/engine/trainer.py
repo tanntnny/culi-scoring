@@ -1,19 +1,31 @@
 from __future__ import annotations
+import os
 from pathlib import Path
 import torch
+from torch.nn.parallel import DistributedDataParallel as DDP
 from ..core.registry import build
 from ..core.logging import Logger
-from ..core.distributed import init_distributed_if_needed, is_global_zero
+from ..core.distributed import init_distributed_if_needed, is_global_zero, cleanup_distributed, is_dist
 from .loop import train_one_epoch, validate
 
 class Trainer:
     def __init__(self, cfg):
         self.cfg = cfg
         init_distributed_if_needed(cfg.ddp)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if cfg.ddp and torch.cuda.is_available():
+            local_rank = int(os.environ.get("LOCAL_RANK", 0))
+            torch.cuda.set_device(local_rank)
+            self.device = torch.device("cuda", local_rank)
+            self._ddp_kwargs = {"device_ids": [local_rank], "output_device": local_rank}
+        else:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self._ddp_kwargs = {"device_ids": None}
 
         self.datamodule = build("data", cfg.data.name, cfg=cfg)
-        self.model = build("model", cfg.model.name, cfg=cfg).to(self.device)
+        model = build("model", cfg.model.name, cfg=cfg).to(self.device)
+        if cfg.ddp and is_dist():
+            model = DDP(model, **{k: v for k, v in self._ddp_kwargs.items() if v is not None})
+        self.model = model
         self.task = build("task", cfg.task.name, cfg=cfg)
         self.task.setup(self.model)
         self.optimizer, self.scheduler = build("optimizer", cfg.train.optimizer, cfg=cfg, model=self.model)
@@ -24,6 +36,8 @@ class Trainer:
         train_loader = self.datamodule.train_dataloader()
         val_loader = self.datamodule.val_dataloader()
         for epoch in range(self.cfg.train.epochs):
+            if hasattr(self.datamodule, "set_epoch"):
+                self.datamodule.set_epoch(epoch)
             self.global_step = train_one_epoch(
                 self.model, self.task, train_loader, self.optimizer, self.scheduler,
                 self.device, amp=self.cfg.train.amp, grad_accum=self.cfg.train.grad_accum,
@@ -45,3 +59,5 @@ class Trainer:
                         "metrics": metrics,
                     }, ckpt_path)
         self.logger.close()
+        if self.cfg.ddp:
+            cleanup_distributed()
