@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=train
-#SBATCH --partition=gpu-limited
+#SBATCH --partition=gpu
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-node=4
