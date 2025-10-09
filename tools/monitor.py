@@ -156,8 +156,8 @@ def main() -> int:
                 if args.cat and ext in _printable:
                     try:
                         with open(path, 'r', encoding='utf-8') as f:
-                            print(f"-------- {path} --------")
-                            print(f.read(), end="\n\n")
+                            print(f"---------------- {path} ----------------")
+                            print(f.read())
                     except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
                         print(f"<Error reading file: {e}>")
             except (FileNotFoundError, PermissionError):
