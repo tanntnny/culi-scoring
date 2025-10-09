@@ -24,6 +24,9 @@ mkdir -p logs
 export PYTHONPATH=${PYTHONPATH:-$PWD}
 export PYTHONFAULTHANDLER=1
 
+# Unbuffered output for real-time logging
+export PYTHONUNBUFFERED=1
+
 # CPU threading (match SLURM allocation)
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 export MKL_NUM_THREADS=$OMP_NUM_THREADS
