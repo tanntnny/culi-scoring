@@ -56,6 +56,8 @@ class Trainer:
         val_loader = self.datamodule.val_dataloader()
         try:
             for epoch in range(self.cfg.train.epochs):
+                if is_global_zero():
+                    print(f"[Trainer] Starting epoch {epoch + 1}/{self.cfg.train.epochs}")
                 if hasattr(self.datamodule, "set_epoch"):
                     self.datamodule.set_epoch(epoch)
                 self.global_step = train_one_epoch(
@@ -69,6 +71,7 @@ class Trainer:
                     # Naive checkpointing
                     ckpt_path = Path(self.cfg.output_dir) / "checkpoints" / f"epoch{epoch:03d}.pt"
                     if is_global_zero():
+                        print(f"[Trainer] Finished epoch {epoch + 1}/{self.cfg.train.epochs}, metrics: {metrics}")
                         ckpt_path.parent.mkdir(parents=True, exist_ok=True)
                         payload = {
                             "model": self.model.state_dict(),

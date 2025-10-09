@@ -34,6 +34,14 @@ class CrossModalScorer(nn.Module):
         except:
             raise ValueError("Please check the model names or paths for audio_encoder and text_encoder.")
 
+        # Ensure BERT operates in encoder-only mode to avoid deprecated encoder_attention_mask usage
+        if hasattr(self.text_encoder, "config"):
+            self.text_encoder.config.is_decoder = False
+            self.text_encoder.config.add_cross_attention = False
+        if hasattr(self.text_encoder, "encoder") and hasattr(self.text_encoder.encoder, "config"):
+            self.text_encoder.encoder.config.is_decoder = False
+            self.text_encoder.encoder.config.add_cross_attention = False
+
         if gradient_checkpointing:
             if hasattr(self.audio_encoder, "gradient_checkpointing_enable"):
                 self.audio_encoder.gradient_checkpointing_enable()

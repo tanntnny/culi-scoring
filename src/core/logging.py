@@ -26,6 +26,10 @@ class Logger:
         for k, v in scalars.items():
             self._tb.add_scalar(k, v, step)
 
+    def log_progress(self, stage: str, batch_idx: int, total_batches: int):
+        if is_global_zero():
+            print(f"[Trainer][{stage}] batch {batch_idx + 1}/{total_batches}")
+
     def close(self):
         if self._tb is not None:
             self._tb.close()

@@ -22,6 +22,8 @@ def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad
             scaler.scale(loss).backward()
         else:
             loss.backward()
+        if logger is not None and hasattr(logger, "log_progress"):
+            logger.log_progress("train", i, len(loader))
         if (i + 1) % grad_accum == 0:
             if clip_grad:
                 if scaler.is_enabled():
@@ -44,10 +46,12 @@ def validate(model, task, loader, device, logger, global_step):
     model.eval()
     total_loss = 0.0; n = 0
     with torch.no_grad():
-        for batch in loader:
+        for i, batch in enumerate(loader):
             batch = batch.to(device)
             out = task.validation_step(batch, model)
             total_loss += float(out.get("val/loss", 0.0)); n += 1
+            if logger is not None and hasattr(logger, "log_progress"):
+                logger.log_progress("val", i, len(loader))
     metrics = task.reduce()
     metrics["val/loss"] = total_loss / max(n, 1)
     if logger is not None:
