@@ -14,6 +14,9 @@ grad_accum: 2
 # Flag passed to DistributedDataParallel to handle modules with conditional branches
 ddp_find_unused_parameters: true
 
+# Set static graph mode for DDP to avoid re-registering hooks (recommended when using checkpointing)
+ddp_static_graph: true
+
 # Log training metrics every N steps (matches trainer expectation)
 log_every_n: 100
 

@@ -35,6 +35,8 @@ class Trainer:
                 ddp_kwargs["device_ids"] = ddp_device_ids
                 ddp_kwargs["output_device"] = ddp_output_device
             model = DDP(model, **ddp_kwargs)
+            if getattr(cfg.train, "ddp_static_graph", False) and hasattr(model, "_set_static_graph"):
+                model._set_static_graph()
         self.model = model
         self.task = build("task", cfg.task.name, cfg=cfg)
         self.task.setup(self.model)
