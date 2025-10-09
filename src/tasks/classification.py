@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from ..interfaces.protocol import BaseTask, ModelModule
-from ..metrics.classification import ConfusionMatrix
+from ..metrics.classification import Accuracy
 from ..interfaces.data import Batch
 from ..core.registry import register
 
@@ -15,7 +15,7 @@ class ClassificationTask(BaseTask):
 
     def setup(self, model: ModelModule = None) -> None:
         self._criterion = nn.CrossEntropyLoss()
-        self.metrics = ConfusionMatrix()
+        self.metrics = Accuracy()
 
     def training_step(self, batch: Batch, model: ModelModule) -> Dict[str, torch.Tensor]:
         out = model(**batch.inputs)

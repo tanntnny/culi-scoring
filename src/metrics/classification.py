@@ -4,6 +4,25 @@ import torch
 
 from ..interfaces.protocol import Metric
 
+# ---------------- Accuracy Metric ----------------
+class Accuracy(Metric):
+    def __init__(self):
+        self.correct = 0
+        self.total = 0
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
+        pred_labels = preds.argmax(dim=-1)
+        self.correct += (pred_labels == target).sum().item()
+        self.total += target.size(0)
+
+    def compute(self):
+        return { "accuracy": self.correct / self.total if self.total > 0 else 0.0 }
+
+    def reset(self) -> None:
+        self.correct = 0
+        self.total = 0
+
+# ---------------- Confusion Matrix Metric ----------------
 class ConfusionMatrix(Metric):
     def __init__(self):
         self.tp = 0

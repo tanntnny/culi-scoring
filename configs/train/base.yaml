@@ -3,13 +3,13 @@ lr: 1e-4
 weight_decay: 0.01
 epochs: 20
 batch: 4
-num_workers: 8
+num_workers: 6
 
 # Enable Automatic Mixed Precision training
 amp: true
 
 # Gradient accumulation steps (1 = no accumulation)
-grad_accum: 2
+grad_accum: 1
 
 # Flag passed to DistributedDataParallel to handle modules with conditional branches
 ddp_find_unused_parameters: true
@@ -18,7 +18,7 @@ ddp_find_unused_parameters: true
 ddp_static_graph: true
 
 # Log training metrics every N steps (matches trainer expectation)
-log_every_n: 100
+log_every_n: 10
 
 # Gradient clipping threshold
 clip_grad: 1.0

@@ -22,8 +22,15 @@ def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad
             scaler.scale(loss).backward()
         else:
             loss.backward()
-        if logger is not None and hasattr(logger, "log_progress"):
-            logger.log_progress("train", i, len(loader))
+        if logger is not None and hasattr(logger, "log_progress") and (i + 1) % log_every_n == 0:
+            logger.log_progress(
+                "train",
+                batch_idx=i,
+                total_batches=len(loader),
+                device=device,
+                extra_scalars=out.get("logs", None),
+                step=global_step,
+            )
         if (i + 1) % grad_accum == 0:
             if clip_grad:
                 if scaler.is_enabled():
@@ -51,7 +58,13 @@ def validate(model, task, loader, device, logger, global_step):
             out = task.validation_step(batch, model)
             total_loss += float(out.get("val/loss", 0.0)); n += 1
             if logger is not None and hasattr(logger, "log_progress"):
-                logger.log_progress("val", i, len(loader))
+                logger.log_progress(
+                    "val",
+                    batch_idx=i,
+                    total_batches=len(loader),
+                    device=device,
+                    step=global_step,
+                )
     metrics = task.reduce()
     metrics["val/loss"] = total_loss / max(n, 1)
     if logger is not None:
