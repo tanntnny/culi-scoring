@@ -27,15 +27,22 @@ class Trainer:
 
         self.datamodule = build("data", cfg.data.name, cfg=cfg)
         model = build("model", cfg.model.name, cfg=cfg).to(self.device)
+        ddp_find_unused = getattr(cfg.train, "ddp_find_unused_parameters", False)
+        ddp_static_graph = getattr(cfg.train, "ddp_static_graph", False)
+        if self._use_ddp and ddp_static_graph and ddp_find_unused:
+            if is_global_zero():
+                print("[Trainer] ddp_static_graph=True; disabling ddp_find_unused_parameters per DDP recommendation.")
+            ddp_find_unused = False
+
         if self._use_ddp:
             ddp_kwargs = {
-                "find_unused_parameters": getattr(cfg.train, "ddp_find_unused_parameters", False)
+                "find_unused_parameters": ddp_find_unused
             }
             if ddp_device_ids is not None:
                 ddp_kwargs["device_ids"] = ddp_device_ids
                 ddp_kwargs["output_device"] = ddp_output_device
             model = DDP(model, **ddp_kwargs)
-            if getattr(cfg.train, "ddp_static_graph", False) and hasattr(model, "_set_static_graph"):
+            if ddp_static_graph and hasattr(model, "_set_static_graph"):
                 model._set_static_graph()
         self.model = model
         self.task = build("task", cfg.task.name, cfg=cfg)
@@ -63,14 +70,18 @@ class Trainer:
                     ckpt_path = Path(self.cfg.output_dir) / "checkpoints" / f"epoch{epoch:03d}.pt"
                     if is_global_zero():
                         ckpt_path.parent.mkdir(parents=True, exist_ok=True)
-                        torch.save({
+                        payload = {
                             "model": self.model.state_dict(),
                             "optimizer": self.optimizer.state_dict(),
                             "scheduler": self.scheduler.state_dict() if self.scheduler else None,
                             "cfg": self.cfg,
                             "global_step": self.global_step,
                             "metrics": metrics,
-                        }, ckpt_path)
+                        }
+                        try:
+                            torch.save(payload, ckpt_path)
+                        except (RuntimeError, OSError) as err:
+                            print(f"[Trainer] Warning: failed to write checkpoint at {ckpt_path}: {err}")
         finally:
             self.logger.close()
             if self._use_ddp:
