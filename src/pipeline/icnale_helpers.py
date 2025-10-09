@@ -44,6 +44,9 @@ def get_label_from_icnale(file_path: str) -> str:
     return label
 
 def get_id_from_icnale(file_path: str) -> str:
+    """
+    e.g. path/to/SM_JPN_PTJ2_090_B1_1.mp3 -> SM_JPN_PTJ2_090_B1_1
+    """
     basename = os.path.basename(file_path)
     basename = basename.replace(".mp3", "").replace(".wav", "").replace(".txt", "")
     return basename
