@@ -65,7 +65,7 @@ def pick(files: List[Path], n: int, select: str) -> List[Path]:
 def human_time(ts: float) -> str:
     return dt.datetime.fromtimestamp(ts).isoformat(sep=" ", timespec="seconds")
 
-_printable = [".out", ".log", ".txt"]
+_printable = [".out", ".log", ".txt", ".err"]
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Monitor recent/oldest files under paths by extension.")
