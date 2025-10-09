@@ -157,7 +157,7 @@ def main() -> int:
                     try:
                         with open(path, 'r', encoding='utf-8') as f:
                             print(f"-------- {path} --------")
-                            print(f.read())
+                            print(f.read(), end="\n\n")
                     except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
                         print(f"<Error reading file: {e}>")
             except (FileNotFoundError, PermissionError):
