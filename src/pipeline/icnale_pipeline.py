@@ -305,6 +305,24 @@ class ICNALEPipeline(BasePipeline):
         df = pd.DataFrame(data)
         print(f"Created dataset with {len(df)} samples")
         
+        # Remove rows with NaN values in feature columns
+        feature_cols = [col for col in df.columns if col not in ['id', 'label', 'meta']]
+        original_len = len(df)
+        
+        if len(feature_cols) > 0:
+            # Remove rows where ALL feature columns are NaN
+            df = df.dropna(subset=feature_cols, how='all')
+            
+            # Also remove rows where any feature column contains NaN as string 'nan'
+            for col in feature_cols:
+                if col in df.columns:
+                    df = df[df[col] != 'nan']
+                    df = df[df[col].notna()]
+            
+            cleaned_len = len(df)
+            if cleaned_len < original_len:
+                print(f"Removed {original_len - cleaned_len} rows with NaN/missing values")
+        
         if missing_files['tokens'] > 0 or missing_files['encoded'] > 0 or missing_files['logmel'] > 0:
             print(f"Missing files summary:")
             for file_type, count in missing_files.items():
@@ -319,7 +337,6 @@ class ICNALEPipeline(BasePipeline):
         df.to_csv(save / "dataset.csv", index=False)
         print(f"Saved complete dataset to: {save / 'dataset.csv'}")
         
-        # Perform K-Fold Stratified Group Split
         # Use get_group_by_id for proper person-level grouping
         df['person_id'] = df['id'].apply(lambda x: get_group_by_id(x))
         
@@ -338,6 +355,33 @@ class ICNALEPipeline(BasePipeline):
         for fold, (train_idx, val_idx) in enumerate(sgkf.split(df, df["label"], groups=df["person_id"])):
             train_df = df.iloc[train_idx].drop('person_id', axis=1)
             val_df = df.iloc[val_idx].drop('person_id', axis=1)
+            
+            # Additional NaN cleaning for fold CSVs
+            feature_cols = [col for col in train_df.columns if col not in ['id', 'label', 'meta']]
+            
+            # Clean train split
+            train_original = len(train_df)
+            if len(feature_cols) > 0:
+                train_df = train_df.dropna(subset=feature_cols, how='all')
+                for col in feature_cols:
+                    if col in train_df.columns:
+                        train_df = train_df[train_df[col] != 'nan']
+                        train_df = train_df[train_df[col].notna()]
+            
+            # Clean validation split  
+            val_original = len(val_df)
+            if len(feature_cols) > 0:
+                val_df = val_df.dropna(subset=feature_cols, how='all')
+                for col in feature_cols:
+                    if col in val_df.columns:
+                        val_df = val_df[val_df[col] != 'nan']
+                        val_df = val_df[val_df[col].notna()]
+            
+            if len(train_df) < train_original:
+                print(f"  Cleaned train fold {fold}: {train_original} -> {len(train_df)} samples")
+            if len(val_df) < val_original:
+                print(f"  Cleaned val fold {fold}: {val_original} -> {len(val_df)} samples")
+            
             train_df.to_csv(save / f"fold_{fold}_train.csv", index=False)
             val_df.to_csv(save / f"fold_{fold}_val.csv", index=False)
             
