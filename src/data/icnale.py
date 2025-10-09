@@ -124,6 +124,9 @@ class MultimodalDataset(Dataset):
                         inputs["encoded"] = artifact.input_values
                         if artifact.attention_mask is not None:
                             inputs["encoded_mask"] = artifact.attention_mask
+                        else:
+                            seq_len = artifact.input_values.shape[-1] if artifact.input_values.dim() > 1 else artifact.input_values.shape[0]
+                            inputs["encoded_mask"] = torch.ones(artifact.input_values.shape[:-1], dtype=torch.bool)
                     elif feat == "logmel":
                         inputs["logmel"] = artifact.spectrogram
                     else:
