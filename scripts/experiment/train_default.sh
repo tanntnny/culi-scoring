@@ -37,6 +37,10 @@ export MASTER_ADDR=$(scontrol show hostnames "$SLURM_NODELIST" | head -n1)
 export MASTER_PORT=${MASTER_PORT:-$((29500 + SLURM_JOB_ID % 1000))}
 export WORLD_SIZE=$SLURM_NTASKS
 
+# Hydra settings
+export HYDRA_FULL_ERROR=1
+export HYDRA_ERROR_ON_UNDEFINED_CONFIG=True
+
 # ---------------- Launch ----------------
 srun --kill-on-bad-exit=1 --gpu-bind=none \
   python3 -m src.main cmd=train ddp=True
