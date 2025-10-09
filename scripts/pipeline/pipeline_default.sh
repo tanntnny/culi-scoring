@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=pipeline
 
-#SBATCH --partition=compute-limited
+#SBATCH --partition=compute
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
