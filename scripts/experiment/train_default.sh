@@ -34,7 +34,7 @@ export NUMEXPR_NUM_THREADS=$OMP_NUM_THREADS
 
 # Master = first host in the allocation; make it visible to all ranks
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_NODELIST" | head -n1)
-export MASTER_PORT=${MASTER_PORT:-29500}
+export MASTER_PORT=${MASTER_PORT:-$((29500 + SLURM_JOB_ID % 1000))}
 
 # Map Slurm -> torch.distributed
 export WORLD_SIZE=$SLURM_NTASKS
