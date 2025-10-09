@@ -76,18 +76,25 @@ class TokenLoader(ArtifactLoader):
         """
         data = torch.load(path, map_location='cpu')
         
-        if not isinstance(data, dict):
-            raise ValueError(f"Expected dict from token file, got {type(data)}")
+        # Handle both dict and transformers.BatchFeature objects
+        if not (hasattr(data, '__getitem__') and hasattr(data, 'get')):
+            raise ValueError(f"Expected dict-like object from token file, got {type(data)}")
+        
+        # Convert BatchFeature to dict if needed for consistent access
+        if hasattr(data, 'data'):  # BatchFeature has a .data attribute
+            data_dict = dict(data)
+        else:
+            data_dict = data
         
         required_keys = ['input_ids', 'attention_mask', 'token_type_ids']
-        missing_keys = [key for key in required_keys if key not in data]
+        missing_keys = [key for key in required_keys if key not in data_dict]
         if missing_keys:
             raise ValueError(f"Missing required keys in token file: {missing_keys}")
         
         return TokenArtifact(
-            input_ids=data['input_ids'],
-            attention_mask=data['attention_mask'],
-            token_type_ids=data['token_type_ids']
+            input_ids=data_dict['input_ids'],
+            attention_mask=data_dict['attention_mask'],
+            token_type_ids=data_dict['token_type_ids']
         )
 
 
@@ -106,15 +113,23 @@ class EncodedLoader(ArtifactLoader):
         """
         data = torch.load(path, map_location='cpu')
         
-        if not isinstance(data, dict):
-            raise ValueError(f"Expected dict from encoded file, got {type(data)}")
+        # Handle both dict and transformers.BatchFeature objects
+        # BatchFeature inherits from dict, so we check for dict-like behavior
+        if not (hasattr(data, '__getitem__') and hasattr(data, 'get')):
+            raise ValueError(f"Expected dict-like object from encoded file, got {type(data)}")
         
-        if 'input_values' not in data:
+        # Convert BatchFeature to dict if needed for consistent access
+        if hasattr(data, 'data'):  # BatchFeature has a .data attribute
+            data_dict = dict(data)
+        else:
+            data_dict = data
+        
+        if 'input_values' not in data_dict:
             raise ValueError("Missing required key 'input_values' in encoded file")
         
         return EncodedArtifact(
-            input_values=data['input_values'],
-            attention_mask=data.get('attention_mask', None)
+            input_values=data_dict['input_values'],
+            attention_mask=data_dict.get('attention_mask', None)
         )
 
 

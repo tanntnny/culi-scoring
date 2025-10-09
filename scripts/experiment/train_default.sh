@@ -19,9 +19,8 @@ mkdir -p logs
 export TRANSFORMERS_OFFLINE=1
 export HF_DATASETS_OFFLINE=1
 
-# NCCL and PyTorch distributed settings
+# NCCL and PyTorch distributed settings (fixed deprecated variables)
 export NCCL_DEBUG=WARN
-export NCCL_ASYNC_ERROR_HANDLING=1
 export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 export PYTHONPATH=${PYTHONPATH:-$PWD}
 export PYTHONFAULTHANDLER=1
