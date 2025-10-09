@@ -3,8 +3,8 @@ name: icnale
 src: datasets/raw/SM
 save: datasets/processed/SM
 
-tokenizer: models/bert-tokenizer
-encoder: models/wav2vec2-processor
+tokenizer: models/bert/bert-tokenizer
+encoder: models/wav2vec2/wav2vec2-processor
 
 target_sample_rate: 16000
 audio_sample_rate: 16000
