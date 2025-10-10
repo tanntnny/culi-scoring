@@ -14,13 +14,19 @@ class Model(nn.Module):
     def __init__(
             self,
             audio_encoder: Path | str,
-            llm_backbone: Path | str
+            phi4mm: Path | str,
+            use_flash_attention: bool = False,
         ):
         super().__init__()
 
         self.audio_encoder = AutoModel.from_pretrained(audio_encoder)
-        self.backbone_config = AutoConfig.from_pretrained(llm_backbone)
-        self.backbone = AutoModelForCausalLM.from_pretrained(llm_backbone).get_decoder()
+        self.backbone = AutoModelForCausalLM.from_pretrained(
+            phi4mm,
+            torch_dtype=torch.bfloat16 if use_flash_attention else torch.float32,
+            _attn_implementation='flash_attention_2' if use_flash_attention else 'sdpa',
+            trust_remote_code=True,
+        )
+        self.backbone.set_lora_adapter("speech")
 
     def forward(
             self,
@@ -32,4 +38,4 @@ class Model(nn.Module):
         """
             Input audio features and text tokens
         """
-        return x
+        return
