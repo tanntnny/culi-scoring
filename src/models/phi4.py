@@ -4,22 +4,17 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from transformers import AutoModelForCausalLM, AutoModel, AutoConfig
+from transformers import AutoModelForCausalLM
 
 # ---------------- Phi4 ----------------
 
-# implement the phi4mm decoder based model
-
-class Model(nn.Module):
+class Phi4BasedScorer(nn.Module):
     def __init__(
             self,
-            audio_encoder: Path | str,
             phi4mm: Path | str,
             use_flash_attention: bool = False,
         ):
         super().__init__()
-
-        self.audio_encoder = AutoModel.from_pretrained(audio_encoder)
         self.backbone = AutoModelForCausalLM.from_pretrained(
             phi4mm,
             torch_dtype=torch.bfloat16 if use_flash_attention else torch.float32,

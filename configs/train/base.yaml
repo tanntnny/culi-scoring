@@ -25,11 +25,11 @@ clip_grad: 1.0
 
 # Profiler
 profiler:
-	enabled: true
-	activities: [cpu, cuda]
-	record_shapes: false
-	profile_memory: false
-	with_stack: false
-	topk: 10
-	tensorboard: true
-	rank_zero_only: true
+  enabled: true
+  activities: [cpu, cuda]
+  record_shapes: false
+  profile_memory: false
+  with_stack: false
+  topk: 10
+  tensorboard: true
+  rank_zero_only: true

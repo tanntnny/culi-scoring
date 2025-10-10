@@ -22,9 +22,7 @@ def _format_top_ops(events, attribute: str, topk: int) -> List[str]:
     metrics = []
     for evt in events:
         metric = getattr(evt, attribute, None)
-        if metric is None:
-            continue
-        if metric <= 0:
+        if metric is None or metric <= 0:
             continue
         metrics.append((evt.key, metric))
     metrics.sort(key=lambda item: item[1], reverse=True)
@@ -51,16 +49,17 @@ class TrainingProfiler:
         if self.rank_zero_only and not is_global_zero():
             self.enabled = False
 
+        self.activities: List[ProfilerActivity] = []
+        self._profile = None
+        self._step_count = 0
+        self._current_epoch = None
+        self._global_step_start = 0
+
         if not self.enabled:
-            self.activities = []
-            self._profile = None
-            self._step_count = 0
-            self._current_epoch = None
-            self._global_step_start = 0
             return
 
         requested_activities = _as_list(cfg.get("activities", ["cpu", "cuda"]))
-        activities = []
+        activities: List[ProfilerActivity] = []
         for name in requested_activities:
             lower = str(name).lower()
             if lower == "cpu":
@@ -77,18 +76,14 @@ class TrainingProfiler:
             if is_global_zero():
                 print("[Profiler] No valid activities configured; disabling profiler.")
             self.enabled = False
+            return
 
         self.activities = activities
-        self._profile = None
-        self._step_count = 0
-        self._current_epoch = None
-        self._global_step_start = 0
 
     def start_epoch(self, epoch_index: int, global_step_start: int):
-        if not self.enabled or self.activities == []:
+        if not self.enabled or not self.activities:
             return
         if self._profile is not None:
-            # Defensive: ensure previous profile is fully closed before reusing
             self._finalize(error=True)
         self._profile = profile(
             activities=self.activities,
@@ -117,8 +112,8 @@ class TrainingProfiler:
             return
 
         events = profile_ctx.key_averages()
-        cpu_total_us = sum(evt.self_cpu_time_total for evt in events if hasattr(evt, "self_cpu_time_total"))
-        cuda_total_us = sum(evt.self_cuda_time_total for evt in events if hasattr(evt, "self_cuda_time_total"))
+        cpu_total_us = sum(getattr(evt, "self_cpu_time_total", 0.0) for evt in events)
+        cuda_total_us = sum(getattr(evt, "self_cuda_time_total", 0.0) for evt in events)
 
         scalars = {"profiler/epoch_steps": float(self._step_count)}
         if cpu_total_us > 0:
@@ -156,7 +151,7 @@ class TrainingProfiler:
                 text_sections.append("Top CPU ops:\n" + "\n".join(top_cpu_ops))
             if top_cuda_ops:
                 text_sections.append("Top CUDA ops:\n" + "\n".join(top_cuda_ops))
-            if text_sections:
+            if text_sections and hasattr(self.logger, "log_text"):
                 self.logger.log_text(
                     f"profiler/epoch_{epoch_display}",
                     "\n\n".join(text_sections),
@@ -170,5 +165,14 @@ class TrainingProfiler:
         self._profile = None
         profile_ctx.__exit__(None, None, None)
         if not error:
-            profile_ctx.key_averages()  # Force materialization to avoid warnings
-```}
+            profile_ctx.key_averages()
+
+    def close(self):
+        if self._profile is not None:
+            self._finalize(error=False)
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
