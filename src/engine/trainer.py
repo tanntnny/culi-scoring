@@ -6,6 +6,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from ..core.registry import build
 from ..core.logging import Logger
 from ..core.distributed import init_distributed_if_needed, is_global_zero, cleanup_distributed, is_dist
+from ..core.profiler import TrainingProfiler
 from .loop import train_one_epoch, validate
 
 class Trainer:
@@ -49,6 +50,8 @@ class Trainer:
         self.task.setup(self.model)
         self.optimizer, self.scheduler = build("optimizer", cfg.train.optimizer, cfg=cfg, model=self.model)
         self.logger = Logger(Path(cfg.output_dir) / "tb")
+        profiler_cfg = getattr(cfg.train, "profiler", None)
+        self.profiler = TrainingProfiler(profiler_cfg, logger=self.logger)
         self.global_step = 0
 
     def fit(self):
@@ -60,12 +63,24 @@ class Trainer:
                     print(f"[Trainer] Starting epoch {epoch + 1}/{self.cfg.train.epochs}")
                 if hasattr(self.datamodule, "set_epoch"):
                     self.datamodule.set_epoch(epoch)
-                self.global_step = train_one_epoch(
-                    self.model, self.task, train_loader, self.optimizer, self.scheduler,
-                    self.device, amp=self.cfg.train.amp, grad_accum=self.cfg.train.grad_accum,
-                    clip_grad=self.cfg.train.clip_grad, logger=self.logger,
-                    global_step_start=self.global_step, log_every_n=self.cfg.train.log_every_n,
-                )
+                profiler = self.profiler if getattr(self.profiler, "enabled", False) else None
+                if profiler is not None:
+                    profiler.start_epoch(epoch, self.global_step)
+                prof_error = None
+                try:
+                    self.global_step = train_one_epoch(
+                        self.model, self.task, train_loader, self.optimizer, self.scheduler,
+                        self.device, amp=self.cfg.train.amp, grad_accum=self.cfg.train.grad_accum,
+                        clip_grad=self.cfg.train.clip_grad, logger=self.logger,
+                        global_step_start=self.global_step, log_every_n=self.cfg.train.log_every_n,
+                        profiler=profiler,
+                    )
+                except BaseException as exc:
+                    prof_error = exc
+                    raise
+                finally:
+                    if profiler is not None:
+                        profiler.stop_epoch(epoch, self.global_step, error=prof_error)
                 if val_loader is not None:
                     metrics = validate(self.model, self.task, val_loader, self.device, self.logger, self.global_step)
                     # Naive checkpointing

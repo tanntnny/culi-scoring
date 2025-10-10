@@ -4,7 +4,7 @@ import torch
 from torch.nn.utils import clip_grad_norm_
 
 
-def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad_accum, clip_grad, logger, global_step_start=0, log_every_n=50):
+def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad_accum, clip_grad, logger, global_step_start=0, log_every_n=50, profiler=None):
     model.train();
     scaler = torch.cuda.amp.GradScaler(enabled=(amp == "fp16"))
     autocast = (torch.autocast(device_type="cuda", dtype=torch.bfloat16) if amp=="bf16" else
@@ -46,6 +46,8 @@ def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad
         if "logs" in out and (i + 1) % log_every_n == 0 and logger is not None:
             logger.log_scalars(out["logs"], global_step)
         global_step += 1
+        if profiler is not None:
+            profiler.step()
     return global_step
 
 

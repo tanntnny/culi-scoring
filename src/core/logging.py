@@ -28,6 +28,11 @@ class Logger:
         for k, v in scalars.items():
             self._tb.add_scalar(k, v, step)
 
+    def log_text(self, tag: str, text: str, step: int):
+        if self._tb is None:
+            return
+        self._tb.add_text(tag, text, step)
+
     def log_progress(
         self,
         stage: str,
