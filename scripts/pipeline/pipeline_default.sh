@@ -41,6 +41,16 @@ export HF_DATASETS_OFFLINE=1
 export HYDRA_FULL_ERROR=1
 export HYDRA_ERROR_ON_UNDEFINED_CONFIG=True
 
+# Set cache directories to project-specific paths
+export HF_HOME=/project/pv823002-ulearn/hf/misc
+export HF_DATASETS_CACHE=/project/pv823002-ulearn/hf/datasets
+export TRANSFORMERS_CACHE=/project/pv823002-ulearn/hf/models
+export TORCH_HOME=/project/pv823002-ulearn/torch
+export WANDB_DIR=/project/pv823002-ulearn/wandb
+export XDG_CACHE_HOME=/project/pv823002-ulearn/.cache
+export TMPDIR=/scratch/pv823002-ulearn/tmp
+mkdir -p "$HF_HOME" "$HF_DATASETS_CACHE" "$TRANSFORMERS_CACHE" "$TORCH_HOME" "$WANDB_DIR" "$XDG_CACHE_HOME" "$TMPDIR"
+
 # ---------------- DDP Rendezvous ----------------
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n1)
 export MASTER_ADDR
