@@ -3,7 +3,7 @@ lr: 1e-4
 weight_decay: 0.01
 epochs: 20
 batch: 4
-num_workers: 6
+num_workers: 8
 
 # Enable Automatic Mixed Precision training
 amp: true
