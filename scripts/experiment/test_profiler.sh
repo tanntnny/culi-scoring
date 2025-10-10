@@ -56,4 +56,4 @@ mkdir -p "$HF_HOME" "$HF_DATASETS_CACHE" "$TRANSFORMERS_CACHE" "$TORCH_HOME" "$W
 
 # ---------------- Launch ----------------
 srun --kill-on-bad-exit=1 --gpu-bind=none \
-  python3 -m src.main cmd=train ddp=True train.epochs=1 profiler.enabled=True
+  python3 -m src.main cmd=train ddp=True train.epochs=1
