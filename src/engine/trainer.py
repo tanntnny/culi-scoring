@@ -5,7 +5,7 @@ import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from ..core.registry import build
 from ..core.logging import Logger
-from ..core.distributed import init_distributed_if_needed, is_global_zero, cleanup_distributed, is_dist
+from ..core.distributed import init_distributed_if_needed, is_global_zero, cleanup_distributed, is_dist, barrier
 from ..core.profiler import TrainingProfiler
 from .loop import train_one_epoch, validate
 
@@ -81,6 +81,8 @@ class Trainer:
                 finally:
                     if profiler is not None:
                         profiler.stop_epoch(epoch, self.global_step, error=prof_error)
+                if self._use_ddp and getattr(self.profiler, "rank_zero_only", False):
+                    barrier()
                 if val_loader is not None:
                     metrics = validate(self.model, self.task, val_loader, self.device, self.logger, self.global_step)
                     # Naive checkpointing
