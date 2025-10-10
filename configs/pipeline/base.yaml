@@ -10,6 +10,7 @@ target_sample_rate: 16000
 audio_sample_rate: 16000
 logmel_sample_rate: 16000
 
+# ---------------- Phi4 Preference ----------------
 logmel_n: 80
 logmel_n_fft: 512
 logmel_hop_length: 160

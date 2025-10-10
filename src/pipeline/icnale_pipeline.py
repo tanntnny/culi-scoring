@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Tuple
 import os
+import shutil
 from collections import defaultdict
 
 import torch
@@ -182,11 +183,15 @@ class ICNALEPipeline(BasePipeline):
         token_folder = save / "text_tokens"
         audio_folder = save / "audio_encoded"
         logmel_folder = save / "audio_logmel"
+        raw_audio_folder = save / "audio"
+        raw_text_folder = save / "text"
         
         # Ensure folders exist
         token_folder.mkdir(parents=True, exist_ok=True)
         audio_folder.mkdir(parents=True, exist_ok=True)
         logmel_folder.mkdir(parents=True, exist_ok=True)
+        raw_audio_folder.mkdir(parents=True, exist_ok=True)
+        raw_text_folder.mkdir(parents=True, exist_ok=True)
         
         print(f"\nSaving preprocessed files to {save} ...")
         
@@ -218,6 +223,9 @@ class ICNALEPipeline(BasePipeline):
                     encoded, log_mel_spectrogram = self.preprocess_audio(f)
                     save_checkpoint(audio_folder / f"{fid}_audio.pt", encoded)
                     save_checkpoint(logmel_folder / f"{fid}_logmel.pt", log_mel_spectrogram)
+                    raw_audio_path = raw_audio_folder / f"{fid}{ext.lower()}"
+                    shutil.copy2(f, raw_audio_path)
+
                     processed_count += 1
                     audio_files += 1
 
@@ -239,6 +247,10 @@ class ICNALEPipeline(BasePipeline):
                             
                         tokens = self.preprocess_text(text)
                         save_checkpoint(token_folder / f"{fid}_token.pt", tokens)
+
+                        raw_text_path = raw_text_folder / f"{fid}.txt"
+                        shutil.copy2(f, raw_text_path)
+
                         processed_count += 1
                         text_files += 1
                     except UnicodeDecodeError as e:
@@ -272,7 +284,7 @@ class ICNALEPipeline(BasePipeline):
         
         # Create dataframe
         data = []
-        missing_files = {'tokens': 0, 'encoded': 0, 'logmel': 0}
+        missing_files = {'tokens': 0, 'encoded': 0, 'logmel': 0, 'audio': 0, 'text': 0}
         
         for fid in fids:
             tokens_path = token_folder / f"{fid}_token.pt"
@@ -297,6 +309,23 @@ class ICNALEPipeline(BasePipeline):
                 row['logmel'] = str(logmel_path)
             else:
                 missing_files['logmel'] += 1
+
+            raw_audio_candidates = []
+            for ext in [".wav", ".mp3", ".flac", ".m4a"]:
+                candidate = raw_audio_folder / f"{fid}{ext}"
+                if candidate.exists():
+                    raw_audio_candidates.append(candidate)
+                    break
+            if raw_audio_candidates:
+                row['audio'] = str(raw_audio_candidates[0])
+            else:
+                missing_files['audio'] += 1
+
+            raw_text_path = raw_text_folder / f"{fid}.txt"
+            if raw_text_path.exists():
+                row['text'] = str(raw_text_path)
+            else:
+                missing_files['text'] += 1
             
             # Only add if we have at least one feature
             if len(row) > 3:
@@ -323,7 +352,7 @@ class ICNALEPipeline(BasePipeline):
             if cleaned_len < original_len:
                 print(f"Removed {original_len - cleaned_len} rows with NaN/missing values")
         
-        if missing_files['tokens'] > 0 or missing_files['encoded'] > 0 or missing_files['logmel'] > 0:
+        if any(count > 0 for count in missing_files.values()):
             print(f"Missing files summary:")
             for file_type, count in missing_files.items():
                 if count > 0:
@@ -404,7 +433,6 @@ class ICNALEPipeline(BasePipeline):
         print(f"   - Output directory: {save}")
         
         return True
-
 
 @register("pipeline", "icnale")
 def build_icnale_pipeline(cfg):
