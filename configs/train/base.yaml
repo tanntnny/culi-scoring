@@ -33,3 +33,9 @@ profiler:
   topk: 10
   tensorboard: true
   rank_zero_only: true
+  schedule:
+    wait: 1
+    warmup: 1
+    active: 4
+    repeat: 1
+    skip_first: 0

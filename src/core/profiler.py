@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Iterable, List, Optional
 
 import torch
-from torch.profiler import ProfilerActivity, profile
+from torch.profiler import ProfilerActivity, profile, schedule as profiler_schedule
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from .distributed import is_global_zero
 
@@ -45,6 +45,30 @@ class TrainingProfiler:
         self.profile_memory = bool(cfg.get("profile_memory", False))
         self.with_stack = bool(cfg.get("with_stack", False))
         self.rank_zero_only = bool(cfg.get("rank_zero_only", True))
+        schedule_cfg = {}
+        if hasattr(cfg, "get"):
+            schedule_cfg = cfg.get("schedule", {})
+        if isinstance(schedule_cfg, DictConfig):
+            schedule_cfg = OmegaConf.to_container(schedule_cfg, resolve=True)
+        elif schedule_cfg is None:
+            schedule_cfg = {}
+        elif not isinstance(schedule_cfg, dict):
+            schedule_cfg = dict(schedule_cfg)
+        if schedule_cfg:
+            wait = int(schedule_cfg.get("wait", 1))
+            warmup = int(schedule_cfg.get("warmup", 1))
+            active = int(schedule_cfg.get("active", 4))
+            repeat = int(schedule_cfg.get("repeat", 1))
+            skip_first = int(schedule_cfg.get("skip_first", 0))
+            self._schedule = profiler_schedule(
+                wait=wait,
+                warmup=warmup,
+                active=active,
+                repeat=repeat,
+                skip_first=skip_first,
+            )
+        else:
+            self._schedule = None
 
         if self.rank_zero_only and not is_global_zero():
             self.enabled = False
@@ -90,6 +114,7 @@ class TrainingProfiler:
             record_shapes=self.record_shapes,
             profile_memory=self.profile_memory,
             with_stack=self.with_stack,
+            schedule=self._schedule,
         )
         self._profile.__enter__()
         self._step_count = 0

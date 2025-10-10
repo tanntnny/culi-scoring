@@ -81,6 +81,8 @@ class Trainer:
                 finally:
                     if profiler is not None:
                         profiler.stop_epoch(epoch, self.global_step, error=prof_error)
+                if torch.cuda.is_available() and self.device.type == "cuda":
+                    torch.cuda.synchronize(self.device)
                 if self._use_ddp and getattr(self.profiler, "rank_zero_only", False):
                     barrier()
                 if val_loader is not None:

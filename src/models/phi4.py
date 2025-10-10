@@ -9,6 +9,8 @@ import torch.nn as nn
 from transformers import AutoModelForCausalLM, AutoProcessor
 from peft import get_peft_model, LoraConfig
 
+from core.distributed import is_global_zero
+
 # ---------------- Phi4 ----------------
 
 @dataclass
@@ -64,9 +66,26 @@ class Phi4BasedScorer(nn.Module):
         # Processor for raw audio/text path (optional)
         self.processor = AutoProcessor.from_pretrained(cfg.model_name_or_path)
     
-    def freeze_backbone(self):
-        # TODO
-        pass
+    def _is_lora_param(self, name: str):
+        name = name.lower()
+        return ("lora_" in name) or (".lora." in name) or (name.endswith("lora_a.weight")) or (name.endswith("lora_b.weight"))
+
+    def freeze_all_except_lora(
+            self,
+            verbose: bool = False,
+    ):
+        lora_count = 0
+        for name, param in self.llm.named_parameters():
+            if not self._is_lora_param(name):
+                param.requires_grad = False
+            else:
+                lora_count += param.numel()
+        
+        if verbose and is_global_zero():
+            total = sum(p.numel() for p in self.llm.parameters())
+            trainable = sum(p.numel() for p in self.llm.parameters() if p.requires_grad)
+            print(f"[freeze] total params: {total/1e6:.2f}M | trainable: {trainable/1e6:.2f}M")
+            print(f"[freeze] LoRA trainable params: {lora_count/1e6:.2f}M")
 
     @torch.no_grad()
     def generate_number(self, messages: List[Dict[str, Any]], max_new_tokens=4):
