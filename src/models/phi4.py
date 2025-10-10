@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from transformers import AutoModelForCausalLM, AutoModel
+from transformers import AutoModelForCausalLM, AutoModel, AutoConfig
 
 # ---------------- Phi4 ----------------
 
@@ -19,15 +19,8 @@ class Model(nn.Module):
         super().__init__()
 
         self.audio_encoder = AutoModel.from_pretrained(audio_encoder)
+        self.backbone_config = AutoConfig.from_pretrained(llm_backbone)
         self.backbone = AutoModelForCausalLM.from_pretrained(llm_backbone).get_decoder()
-
-        self.audio_projector = nn.Sequential(
-            nn.Linear(self.audio_encoder.config.hidden_size, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, self.backbone.config.input_size)
-        )
-        
-        
 
     def forward(
             self,
