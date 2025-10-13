@@ -34,6 +34,9 @@ class Phi4ScorerModel(nn.Module):
             x: Any
     ):
         return self.model(**x)
+
+    def prepare_inputs_for_generation(self, *args, **kwargs):
+        return self.model.prepare_inputs_for_generation(*args, **kwargs)
         
     def _is_lora_param(self, name: str) -> bool:
         return "lora" in name
