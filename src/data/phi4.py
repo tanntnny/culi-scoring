@@ -27,11 +27,11 @@ label_mapping = {
 class Phi4DMConfig:
     name: str
     instruction: str
-    batch: int
+    batch: int = None
     train: str
     val: str
-    test: str
-    num_workers: int
+    test: str = None
+    num_workers: int = None
 
 # ---------------- Collator ----------------
 class Phi4Collator:
