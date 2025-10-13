@@ -10,6 +10,8 @@ from ..core.registry import register
 class Phi4ModelConfig:
     name: str
     src: str
+    torch_dtype: str = "float16"
+    attn_implementation: str = "flash_attention_2"
 
 # ---------------- Phi4 Model ----------------
 class Phi4ScorerModel(nn.Module):
@@ -22,6 +24,8 @@ class Phi4ScorerModel(nn.Module):
         self.model = AutoModelForCausalLM.from_pretrained(
             self.config.src,
             trust_remote_code=True,
+            torch_dtype=self.config.torch_dtype,
+            attn_implementation=self.config.attn_implementation
         )
         self.model.set_lora_adapter("speech")
 

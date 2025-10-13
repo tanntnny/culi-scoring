@@ -46,7 +46,6 @@ export HYDRA_ERROR_ON_UNDEFINED_CONFIG=True
 # Set cache directories to project-specific paths
 export HF_HOME=/project/pv823002-ulearn/hf/misc
 export HF_DATASETS_CACHE=/project/pv823002-ulearn/hf/datasets
-export TRANSFORMERS_CACHE=/project/pv823002-ulearn/hf/models
 export TORCH_HOME=/project/pv823002-ulearn/torch
 export WANDB_DIR=/project/pv823002-ulearn/wandb
 export XDG_CACHE_HOME=/project/pv823002-ulearn/.cache

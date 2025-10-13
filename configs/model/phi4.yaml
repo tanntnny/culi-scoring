@@ -1,2 +1,4 @@
 name: phi4
 src: models/phi4/phi4-model
+torch_dtype: float16
+attn_implementation: flash_attention_2
