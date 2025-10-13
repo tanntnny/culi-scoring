@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torch.distributed import DistributedSampler
-from transformers import AutoProcessor, GenerationConfig
+from torch.utils.data.distributed import DistributedSampler
+from transformers import AutoProcessor
 import soundfile as sf
 import pandas as pd
 from dataclasses import dataclass
