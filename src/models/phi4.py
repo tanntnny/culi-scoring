@@ -8,6 +8,7 @@ from ..core.registry import register
 # ---------------- Config ----------------
 @dataclass
 class Phi4ModelConfig:
+    name: str
     src: str
 
 # ---------------- Phi4 Model ----------------

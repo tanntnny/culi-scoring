@@ -25,6 +25,7 @@ label_mapping = {
 # ---------------- Phi4 Config ----------------
 @dataclass
 class Phi4DMConfig:
+    name: str
     instruction: str
     batch: int
     train: str
