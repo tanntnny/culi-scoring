@@ -26,10 +26,8 @@ class Phi4ScorerModel(nn.Module):
             self.user_config.src,
             trust_remote_code=True
         )
-        self.config.use_lora = False
         self.model = AutoModelForCausalLM.from_pretrained(
             self.user_config.src,
-            config=self.config,
             trust_remote_code=True,
             torch_dtype=self.user_config.torch_dtype,
             attn_implementation=self.user_config.attn_implementation
