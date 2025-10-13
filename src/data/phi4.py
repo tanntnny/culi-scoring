@@ -27,9 +27,9 @@ label_mapping = {
 class Phi4DMConfig:
     name: str
     instruction: str
-    batch: int = None
     train: str
     val: str
+    batch: int = None
     test: str = None
     num_workers: int = None
 
