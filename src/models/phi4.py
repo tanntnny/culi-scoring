@@ -1,5 +1,7 @@
 import torch.nn as nn
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoConfig
+from peft import get_peft_model, LoraConfig
+import types
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,14 +23,36 @@ class Phi4ScorerModel(nn.Module):
     ):
         super().__init__()
         self.config = Phi4ModelConfig(**cfg.model)
+        config = AutoConfig.from_pretrained(self.config.src, trust_remote_code=True)
+        vision_peft_config = config.vision_peft_config
+        speech_peft_config = config.speech_peft_config
+        config.vision_peft_config = None
+        config.speech_peft_config = None
+
         self.model = AutoModelForCausalLM.from_pretrained(
             self.config.src,
+            config=config,
             trust_remote_code=True,
             torch_dtype=self.config.torch_dtype,
             attn_implementation=self.config.attn_implementation
         )
-        self.model.set_lora_adapter("speech")
 
+        def prepare_inputs_for_generation_patch(self, *args, **kwargs):
+            return self.model.prepare_inputs_for_generation(*args, **kwargs)
+
+        self.model.model.prepare_inputs_for_generation = types.MethodType(
+            prepare_inputs_for_generation_patch, self.model.model
+        )
+
+        if vision_peft_config:
+            vision_lora_config = LoraConfig(**vision_peft_config)
+            self.model.model = get_peft_model(self.model.model, vision_lora_config, adapter_name="vision")
+
+        if speech_peft_config:
+            speech_lora_config = LoraConfig(**speech_peft_config)
+            self.model.model = get_peft_model(self.model.model, speech_lora_config, adapter_name="speech")
+
+        self.model.set_lora_adapter("speech")
     def forward(
             self,
             x: Any
