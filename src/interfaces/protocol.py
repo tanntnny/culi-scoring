@@ -24,6 +24,9 @@ from torch.utils.data import DataLoader
 
 class DataModule(Protocol):
     """Protocol for data modules that provide train/val/test dataloaders."""
+    def __init__(self, cfg: Any) -> None:
+        """Initialize data module with configuration."""
+        self.cfg = cfg
     
     def train_dataloader(self) -> DataLoader:
         """Return training dataloader."""
@@ -38,9 +41,7 @@ class DataModule(Protocol):
         ...
 
 
-# ============================================================================
-# Model Protocols
-# ============================================================================
+# ---------------- Model Protocol ----------------
 
 class ModelModule(Protocol):
     """Protocol for model modules that can be used in the training framework."""
@@ -49,6 +50,12 @@ class ModelModule(Protocol):
         """Forward pass of the model."""
         ...
 
+class ModelWithLoRA(ModelModule, Protocol):
+    """Protocol for models that support LoRA fine-tuning."""
+    
+    def freeze_all_except_lora(self) -> None:
+        """Freeze all model parameters except those related to LoRA."""
+        ...
 
 # ============================================================================
 # Task Protocols

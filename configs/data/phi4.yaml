@@ -1,0 +1,4 @@
+name: phi4
+instruction: "You are a specialist in English speaking scorer. Your task is to evaluate the proficiency of English speaking from this given audio. You have to consider criteria like pronunciation, and delivery. Expected output to be a single number from 0 to 3 where 0 is the lowest and 3 is the highest proficiency."
+train: datasets/processed/SM-preprocessed/fold_0_train.csv
+val: datasets/processed/SM-preprocessed/fold_0_val.csv
