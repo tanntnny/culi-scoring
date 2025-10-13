@@ -1,5 +1,5 @@
 import torch.nn as nn
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoConfig
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,12 +21,18 @@ class Phi4ScorerModel(nn.Module):
             cfg
     ):
         super().__init__()
-        self.config = Phi4ModelConfig(**cfg.model)
+        self.user_config = Phi4ModelConfig(**cfg.model)
+        self.config = AutoConfig.from_pretrained(
+            self.user_config.src,
+            trust_remote_code=True
+        )
+        self.config.use_lora = False
         self.model = AutoModelForCausalLM.from_pretrained(
-            self.config.src,
+            self.user_config.src,
+            config=self.config,
             trust_remote_code=True,
-            torch_dtype=self.config.torch_dtype,
-            attn_implementation=self.config.attn_implementation
+            torch_dtype=self.user_config.torch_dtype,
+            attn_implementation=self.user_config.attn_implementation
         )
         self.model.set_lora_adapter("speech")
 
@@ -36,9 +42,6 @@ class Phi4ScorerModel(nn.Module):
     ):
         return self.model(**x)
 
-    def prepare_inputs_for_generation(self, *args, **kwargs):
-        return self.model.prepare_inputs_for_generation(*args, **kwargs)
-        
     def _is_lora_param(self, name: str) -> bool:
         return "lora" in name
 
