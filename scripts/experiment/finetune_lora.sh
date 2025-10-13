@@ -50,7 +50,7 @@ export TORCH_HOME=/project/pv823002-ulearn/torch
 export WANDB_DIR=/project/pv823002-ulearn/wandb
 export XDG_CACHE_HOME=/project/pv823002-ulearn/.cache
 export TMPDIR=/scratch/pv823002-ulearn/tmp
-mkdir -p "$HF_HOME" "$HF_DATASETS_CACHE" "$TRANSFORMERS_CACHE" "$TORCH_HOME" "$WANDB_DIR" "$XDG_CACHE_HOME" "$TMPDIR"
+mkdir -p "$HF_HOME" "$HF_DATASETS_CACHE" "$TORCH_HOME" "$WANDB_DIR" "$XDG_CACHE_HOME" "$TMPDIR"
 
 
 # ---------------- Launch ----------------
