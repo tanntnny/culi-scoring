@@ -61,7 +61,7 @@ class Phi4Collator:
 
         inputs = self.processor(
             text=[self.get_prompt() for _ in range(len(samples))],
-            audio=audios,
+            audios=audios,
             sampling_rate=sample_rates[0],
             return_tensors="pt",
             padding=True,
