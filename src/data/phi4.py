@@ -54,7 +54,6 @@ class Phi4Collator:
     def __call__(self, samples: List[Sample]) -> Batch:
         batch = Batch(inputs={}, outputs={}, meta={})
         audios = [s.inputs["audio"] for s in samples]
-        sample_rates = [s.inputs["sample_rate"] for s in samples]
         texts = [s.inputs["text"] for s in samples]
         labels = [s.outputs["label"] for s in samples]
         metas = [s.meta for s in samples]
@@ -62,7 +61,6 @@ class Phi4Collator:
         inputs = self.processor(
             text=[self.get_prompt() for _ in range(len(samples))],
             audios=audios,
-            sampling_rate=sample_rates[0],
             return_tensors="pt",
             padding=True,
         )
