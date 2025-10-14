@@ -44,9 +44,9 @@ class Trainer:
             if ddp_device_ids is not None:
                 ddp_kwargs["device_ids"] = ddp_device_ids
                 ddp_kwargs["output_device"] = ddp_output_device
-            model = DDP(model, **ddp_kwargs)
-            if ddp_static_graph and hasattr(model, "_set_static_graph"):
-                model._set_static_graph()
+            self.model = DDP(self.model, **ddp_kwargs)
+            if ddp_static_graph and hasattr(self.model, "_set_static_graph"):
+                self.model._set_static_graph()
         self.optimizer, self.scheduler = build("optimizer", cfg.train.optimizer, cfg=cfg, model=self.model)
         self.logger = Logger(Path(cfg.output_dir) / "tb")
         profiler_cfg = getattr(cfg.train, "profiler", None)
