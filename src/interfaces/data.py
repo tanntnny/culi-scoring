@@ -9,8 +9,8 @@ from .protocol import BatchProtocol
 @dataclass
 class Sample:
     """Concrete implementation of Sample for handling individual data samples."""
-    inputs: Dict[str, torch.Tensor]
-    outputs: Dict[str, torch.Tensor]
+    inputs: Dict[str, torch.Tensor] = {}
+    outputs: Dict[str, torch.Tensor] = {}
     meta: Optional[Dict[str, Any]] = None
 
 # ---------------- Batch ---------------- # returned from collate function
