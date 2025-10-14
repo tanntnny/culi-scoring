@@ -84,6 +84,20 @@ class Phi4ScorerModel(nn.Module):
                 lora_params += param.numel()
         print(f"[Model] LoRA fine-tuning enabled. Trainable parameters: {lora_params * 1.0 / 1e6 : .2f}M/{total_params * 1.0 / 1e6 : .2f}M")
 
+    def _is_head_param(self, name: str) -> bool:
+        return "lm_head" in name
+    
+    def unfreeze_head(self):
+        head_params = 0
+        total_params = 0
+        for param in self.model.parameters():
+            total_params += param.numel()
+        for name, param in self.model.named_parameters():
+            if self._is_head_param(name):
+                param.requires_grad = True
+                head_params += param.numel()
+        print(f"[Model] LM head unfrozen. Trainable parameters: {head_params * 1.0 / 1e6 : .2f}M/{total_params * 1.0 / 1e6 : .2f}M")
+
 @register("model", "phi4")
 def build_phi4_model(cfg) -> nn.Module:
     return Phi4ScorerModel(cfg)
