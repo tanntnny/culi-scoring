@@ -70,12 +70,11 @@ class Phi4Collator:
             padding=True,
         )
         
-        with self.processor.as_target_processor():
-            targets = self.processor(
-                text=[str(l) for l in labels],
-                return_tensors="pt",
-                padding=True,
-            )
+        targets = self.processor(
+            text=[str(l) for l in labels],
+            return_tensors="pt",
+            padding=True,
+        )
             
         inputs["labels"] = targets["input_ids"]
         batch.inputs = inputs
