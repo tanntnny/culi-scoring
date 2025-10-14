@@ -27,7 +27,9 @@ class Trainer:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.datamodule = build("data", cfg.data.name, cfg=cfg)
-        model = build("model", cfg.model.name, cfg=cfg).to(self.device)
+        self.model = build("model", cfg.model.name, cfg=cfg).to(self.device)
+        self.task = build("task", cfg.task.name, cfg=cfg)
+        self.task.setup(self.model)
         ddp_find_unused = getattr(cfg.train, "ddp_find_unused_parameters", False)
         ddp_static_graph = getattr(cfg.train, "ddp_static_graph", False)
         if self._use_ddp and ddp_static_graph and ddp_find_unused:
@@ -45,9 +47,6 @@ class Trainer:
             model = DDP(model, **ddp_kwargs)
             if ddp_static_graph and hasattr(model, "_set_static_graph"):
                 model._set_static_graph()
-        self.model = model
-        self.task = build("task", cfg.task.name, cfg=cfg)
-        self.task.setup(self.model)
         self.optimizer, self.scheduler = build("optimizer", cfg.train.optimizer, cfg=cfg, model=self.model)
         self.logger = Logger(Path(cfg.output_dir) / "tb")
         profiler_cfg = getattr(cfg.train, "profiler", None)
