@@ -35,7 +35,7 @@ def init_distributed_if_needed(ddp: bool) -> None:
         backend = "nccl"
     
     try:
-        dist.init_process_group(backend=backend, init_method="env://")
+        dist.init_process_group(backend=backend, init_method="env://", timeout=600)
         if dist.is_initialized():
             rank = dist.get_rank()
             world_size = dist.get_world_size()
