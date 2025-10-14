@@ -4,6 +4,7 @@ import os
 from contextlib import contextmanager
 import torch
 import torch.distributed as dist
+from datetime import timedelta
 
 
 def is_dist() -> bool:
@@ -35,7 +36,7 @@ def init_distributed_if_needed(ddp: bool) -> None:
         backend = "nccl"
     
     try:
-        dist.init_process_group(backend=backend, init_method="env://", timeout=600)
+        dist.init_process_group(backend=backend, init_method="env://", timeout=timedelta(minutes=30))
         if dist.is_initialized():
             rank = dist.get_rank()
             world_size = dist.get_world_size()
