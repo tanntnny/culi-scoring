@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=train
+#SBATCH --job-name=finetune
 #SBATCH --partition=gpu
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=4

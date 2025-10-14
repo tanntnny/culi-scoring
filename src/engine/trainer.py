@@ -14,6 +14,11 @@ class Trainer:
         self.cfg = cfg
         init_distributed_if_needed(cfg.ddp)
         self._use_ddp = cfg.ddp and is_dist()
+        
+        # Warn if DDP was requested but not initialized
+        if cfg.ddp and not self._use_ddp:
+            if is_global_zero():
+                print("[Trainer] Warning: DDP was requested but distributed process group is not initialized. Running without DDP.")
 
         ddp_device_ids = None
         ddp_output_device = None
