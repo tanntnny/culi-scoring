@@ -50,26 +50,33 @@ class Phi4Collator:
             f"<|end|>"
             f"<|assistant|>"
         )
-    
+
     def __call__(self, samples: List[Sample]) -> Batch:
         batch = Batch(inputs={}, outputs={}, meta={})
-        audios = [s.inputs["audio"] for s in samples]
+        
+        # --- FIX IS HERE ---
+        # Create a list of (audio_array, sample_rate) tuples.
+        audios = [(s.inputs["audio"], s.inputs["sample_rate"]) for s in samples]
+        
         texts = [s.inputs["text"] for s in samples]
         labels = [s.outputs["label"] for s in samples]
         metas = [s.meta for s in samples]
 
+        # Now the 'audios' variable has the correct format for the processor
         inputs = self.processor(
             text=[self.get_prompt() for _ in range(len(samples))],
             audios=audios,
             return_tensors="pt",
             padding=True,
         )
+        
         with self.processor.as_target_processor():
             targets = self.processor(
                 text=[str(l) for l in labels],
                 return_tensors="pt",
                 padding=True,
             )
+            
         inputs["labels"] = targets["input_ids"]
         batch.inputs = inputs
         batch.outputs = {
