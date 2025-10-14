@@ -134,6 +134,10 @@ class Phi4DataModule(DataModule):
             instruction=self.config.instruction,
             src=cfg.model.src,
         )
+        
+        self.train_sampler = None
+        self.val_sampler = None
+        self.test_sampler = None
     
     def train_dataloader(self):
         dataset = Phi4Dataset(self.config.train)
