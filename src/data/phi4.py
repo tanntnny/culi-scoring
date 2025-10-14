@@ -52,7 +52,7 @@ class Phi4Collator:
         )
     
     def __call__(self, samples: List[Sample]) -> Batch:
-        batch = Batch()
+        batch = Batch(inputs={}, outputs={}, meta={})
         audios = [s.inputs["audio"] for s in samples]
         sample_rates = [s.inputs["sample_rate"] for s in samples]
         texts = [s.inputs["text"] for s in samples]
