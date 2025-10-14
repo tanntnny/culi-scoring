@@ -1,5 +1,5 @@
 from typing import Dict, Optional, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch
 
@@ -9,8 +9,8 @@ from .protocol import BatchProtocol
 @dataclass
 class Sample:
     """Concrete implementation of Sample for handling individual data samples."""
-    inputs: Dict[str, torch.Tensor] = {}
-    outputs: Dict[str, torch.Tensor] = {}
+    inputs: Dict[str, torch.Tensor] = field(default_factory=dict)
+    outputs: Dict[str, torch.Tensor] = field(default_factory=dict)
     meta: Optional[Dict[str, Any]] = None
 
 # ---------------- Batch ---------------- # returned from collate function
