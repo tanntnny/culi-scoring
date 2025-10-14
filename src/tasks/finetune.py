@@ -19,17 +19,7 @@ class FinetuneLoRATask(BaseTask):
         model.freeze_all_except_lora()
 
     def training_step(self, batch: Batch, model: ModelModule) -> Dict[str, torch.Tensor]:
-        # debug key of the batch.inputs
-        for key in batch.inputs.keys():
-            print(f"batch.inputs[{key}]: {batch.inputs[key].shape}")
-
-        model_inputs = {
-            "attention_mask": batch.inputs["attention_mask"],
-            "audio_values": batch.inputs["audio_values"],
-            "labels": batch.inputs["labels"],
-        }
-        
-        out = model(**model_inputs)
+        out = model(**batch.inputs)
         loss = self._criterion(out, batch.outputs["labels"])
         return {"train/loss": loss, "logs": {"train/loss": loss.item()}}
 
