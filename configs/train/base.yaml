@@ -2,7 +2,7 @@ optimizer: adamw
 lr: 1e-4
 weight_decay: 0.01
 epochs: 20
-batch: 4
+batch: 1
 num_workers: 8
 
 # Enable Automatic Mixed Precision training
