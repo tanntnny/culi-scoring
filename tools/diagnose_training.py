@@ -121,11 +121,27 @@ def test_model_loading(cfg):
     try:
         from src.core.registry import build
         import torch
+        from pathlib import Path
         
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"  Using device: {device}")
         
         print("  Loading model...")
+        print(f"  Model config:")
+        print(f"    name: {cfg.model.name}")
+        print(f"    src: {cfg.model.src}")
+        print(f"    torch_dtype: {cfg.model.get('torch_dtype', 'N/A')}")
+        print(f"    gradient_checkpointing: {cfg.model.get('gradient_checkpointing', 'N/A')}")
+        
+        # Check if model path exists
+        model_path = Path(cfg.model.src)
+        if not model_path.exists():
+            print(f"  ⚠️  Warning: Model path does not exist: {model_path}")
+            print(f"      Absolute path: {model_path.absolute()}")
+            print(f"      Will try to download from HuggingFace...")
+        else:
+            print(f"  ✓ Model path exists: {model_path}")
+        
         model = build("model", cfg.model.name, cfg=cfg)
         print(f"✓ Model loaded: {type(model).__name__}")
         
@@ -144,7 +160,28 @@ def test_model_loading(cfg):
         return model
     except Exception as e:
         print(f"✗ Model loading failed:")
+        print(f"  Error type: {type(e).__name__}")
+        print(f"  Error message: {str(e)}")
+        print()
+        print("Full traceback:")
+        print("-" * 60)
         traceback.print_exc()
+        print("-" * 60)
+        print()
+        
+        # Add helpful hints based on error type
+        if "No such file or directory" in str(e) or "FileNotFoundError" in str(type(e).__name__):
+            print("💡 Hint: The model path might not exist.")
+            print(f"   Check if '{cfg.model.src}' is correct.")
+            print(f"   Current directory: {os.getcwd()}")
+        elif "trust_remote_code" in str(e):
+            print("💡 Hint: This model requires trust_remote_code=True")
+        elif "CUDA" in str(e) or "out of memory" in str(e).lower():
+            print("💡 Hint: GPU memory issue. Try:")
+            print("   - Increase SLURM memory: #SBATCH --mem=64G")
+            print("   - Or set gradient_checkpointing: true in config")
+        
+        print()
         return None
 
 
@@ -239,6 +276,14 @@ def main():
     
     # Print environment info
     print_environment_info()
+    
+    # Note about error logs
+    slurm_job_id = os.environ.get('SLURM_JOB_ID')
+    if slurm_job_id:
+        print("NOTE: If you see errors, also check:")
+        print(f"  - logs/diagnose-{slurm_job_id}.err (stderr)")
+        print(f"  - logs/diagnose-{slurm_job_id}.out (stdout)")
+        print()
     
     # Test imports
     if not test_imports():

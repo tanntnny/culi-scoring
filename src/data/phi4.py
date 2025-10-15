@@ -34,6 +34,11 @@ class Phi4DMConfig:
     num_workers: int = None
 
 # ---------------- Collator ----------------
+import torch
+from pathlib import Path
+from typing import List
+from transformers import AutoProcessor
+
 class Phi4Collator:
     def __init__(self, instruction: str, src: str | Path):
         self.instruction = instruction
@@ -43,6 +48,7 @@ class Phi4Collator:
         )
 
     def get_prompt(self) -> str:
+        """Constructs the prompt with placeholders for audio and instructions."""
         return (
             f"<|user|>"
             f"<|audio_1|>"
@@ -52,36 +58,78 @@ class Phi4Collator:
         )
 
     def __call__(self, samples: List[Sample]) -> Batch:
+        """
+        Processes a list of samples into a single batch ready for the model.
+        This function handles tokenization, audio processing, and label creation.
+        """
         batch = Batch(inputs={}, outputs={}, meta={})
-        
-        # --- FIX IS HERE ---
-        # Create a list of (audio_array, sample_rate) tuples.
+
+        # 1. Extract data from samples
         audios = [(s.inputs["audio"], s.inputs["sample_rate"]) for s in samples]
-        
-        texts = [s.inputs["text"] for s in samples]
-        labels = [s.outputs["label"] for s in samples]
+        # The labels from the dataset are integers, convert them to strings for the processor
+        # This is what the model will learn to generate as text
+        labels_as_text = [str(s.outputs["label"]) for s in samples]
+        original_labels = [s.outputs["label"] for s in samples]
         metas = [s.meta for s in samples]
 
-        # Now the 'audios' variable has the correct format for the processor
+        # 2. Process the prompts and audio
+        # This tokenizes the text prompt and processes the raw audio into features.
+        prompts = [self.get_prompt() for _ in range(len(samples))]
         inputs = self.processor(
-            text=[self.get_prompt() for _ in range(len(samples))],
+            text=prompts,
             audios=audios,
             return_tensors="pt",
             padding=True,
         )
-        
+
+        # 3. Process the target answers
+        # We add special tokens to signal the end of the generated text.
+        answer_suffix = "<|end|><|endoftext|>"
+        answers = [f"{text_label}{answer_suffix}" for text_label in labels_as_text]
         targets = self.processor(
-            text=[str(l) for l in labels],
+            text=answers,
             return_tensors="pt",
             padding=True,
         )
-            
-        inputs["labels"] = targets["input_ids"]
+
+        # 4. Combine prompts and answers for Causal LM training
+        # The model needs to see the prompt and answer concatenated together.
+        prompt_input_ids = inputs["input_ids"]
+        answer_input_ids = targets["input_ids"]
+        
+        # Combine the token IDs
+        full_input_ids = torch.cat([prompt_input_ids, answer_input_ids], dim=1)
+
+        # 5. Create the `labels` tensor for loss calculation
+        # We mask the prompt tokens by setting their label to -100, so the loss is
+        # only calculated on the tokens the model is supposed to generate (the answer).
+        prompt_len = prompt_input_ids.shape[1]
+        
+        # Create a tensor of -100s with the same shape as the prompt tokens
+        prompt_labels = torch.full_like(prompt_input_ids, -100)
+        
+        # Combine the masked prompt labels with the real answer labels
+        full_labels = torch.cat([prompt_labels, answer_input_ids], dim=1)
+        
+        # 6. Update the attention mask to cover the full sequence
+        if "attention_mask" in inputs:
+            # The attention mask for the answer part is all 1s since it's real content
+            answer_mask = torch.ones_like(answer_input_ids)
+            full_attention_mask = torch.cat([inputs["attention_mask"], answer_mask], dim=1)
+            inputs["attention_mask"] = full_attention_mask
+
+        # 7. Finalize the batch
+        # Replace original inputs with the new combined and labeled tensors
+        inputs["input_ids"] = full_input_ids
+        inputs["labels"] = full_labels
+        
         batch.inputs = inputs
         batch.outputs = {
-            "labels": torch.tensor(labels, dtype=torch.long),
+            # Keep the original integer labels for metric calculation if needed
+            "labels": torch.tensor(original_labels, dtype=torch.long),
         }
         batch.meta = metas
+        
         return batch
     
 # ---------------- Dataset ----------------
