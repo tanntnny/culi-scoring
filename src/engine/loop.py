@@ -4,6 +4,16 @@ import torch
 from torch.nn.utils import clip_grad_norm_
 
 
+def log_memory_usage(device, step=None):
+    """Log current GPU memory usage"""
+    if torch.cuda.is_available() and device.type == "cuda":
+        allocated = torch.cuda.memory_allocated(device) / 1e9
+        reserved = torch.cuda.memory_reserved(device) / 1e9
+        max_allocated = torch.cuda.max_memory_allocated(device) / 1e9
+        step_str = f"[Step {step}] " if step is not None else ""
+        print(f"{step_str}GPU Memory - Allocated: {allocated:.2f}GB, Reserved: {reserved:.2f}GB, Max: {max_allocated:.2f}GB")
+
+
 def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad_accum, clip_grad, logger, global_step_start=0, log_every_n=50, profiler=None):
     model.train();
     scaler = torch.cuda.amp.GradScaler(enabled=(amp == "fp16"))
@@ -13,6 +23,11 @@ def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad
 
     global_step = global_step_start
     optimizer.zero_grad(set_to_none=True)
+    
+    # Log initial memory
+    if global_step_start == 0:
+        log_memory_usage(device, step=0)
+    
     for i, batch in enumerate(loader):
         batch = batch.to(device)
         with autocast:
@@ -45,6 +60,8 @@ def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad
                 scheduler.step()
         if "logs" in out and (i + 1) % log_every_n == 0 and logger is not None:
             logger.log_scalars(out["logs"], global_step)
+            # Log memory every log_every_n steps
+            log_memory_usage(device, step=global_step)
         global_step += 1
         if profiler is not None:
             profiler.step()

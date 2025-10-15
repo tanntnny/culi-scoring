@@ -13,6 +13,9 @@ class Phi4ModelConfig:
     src: str
     torch_dtype: str = "float16"
     attn_implementation: str = "flash_attention_2"
+    low_cpu_mem_usage: bool = True
+    use_cache: bool = False
+    gradient_checkpointing: bool = True
 
 # ---------------- Phi4 Model ----------------
 class Phi4ScorerModel(nn.Module):
@@ -23,16 +26,34 @@ class Phi4ScorerModel(nn.Module):
     ):
         super().__init__()
         self.user_config = Phi4ModelConfig(**cfg.model)
+        
+        # Get dtype
+        dtype_map = {
+            "float16": torch.float16,
+            "bfloat16": torch.bfloat16,
+            "float32": torch.float32,
+        }
+        torch_dtype = dtype_map.get(self.user_config.torch_dtype, torch.float16)
+        
         self.config = AutoConfig.from_pretrained(
             self.user_config.src,
             trust_remote_code=True
         )
+        
+        # Load model with memory optimizations
         self.model = AutoModelForCausalLM.from_pretrained(
             self.user_config.src,
             trust_remote_code=True,
-            torch_dtype=self.user_config.torch_dtype,
-            attn_implementation=self.user_config.attn_implementation
+            torch_dtype=torch_dtype,
+            attn_implementation=self.user_config.attn_implementation,
+            low_cpu_mem_usage=self.user_config.low_cpu_mem_usage,
+            use_cache=self.user_config.use_cache,
         )
+        
+        # Enable gradient checkpointing for memory efficiency
+        if self.user_config.gradient_checkpointing:
+            self.model.gradient_checkpointing_enable()
+        
         self.model.set_lora_adapter("speech")
 
     def forward(
@@ -59,6 +80,7 @@ class Phi4ScorerModel(nn.Module):
             batch.inputs[input_mode]: torch.Size([1])
             batch.inputs[labels]: torch.Size([4, 1])
         """
+        # Forward pass with cache disabled for memory efficiency
         return self.model(
             input_ids=input_ids,
             input_audio_embeds=input_audio_embeds,
@@ -67,6 +89,7 @@ class Phi4ScorerModel(nn.Module):
             attention_mask=attention_mask,
             input_mode=input_mode,
             labels=labels,
+            use_cache=False,  # Explicitly disable cache during training
         )
 
     def _is_lora_param(self, name: str) -> bool:

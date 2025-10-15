@@ -1,4 +1,7 @@
 name: phi4
 src: models/phi4/phi4-model
-torch_dtype: float16
+torch_dtype: bfloat16  # Changed from float16 to bfloat16 for better stability and memory
 attn_implementation: flash_attention_2
+low_cpu_mem_usage: true  # Enable low CPU memory usage during model loading
+use_cache: false  # Disable KV cache to save memory during training
+gradient_checkpointing: true  # Enable gradient checkpointing to trade compute for memory
