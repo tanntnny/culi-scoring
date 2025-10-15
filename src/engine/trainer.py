@@ -79,8 +79,15 @@ class Trainer:
                         global_step_start=self.global_step, log_every_n=self.cfg.train.log_every_n,
                         profiler=profiler,
                     )
-                except BaseException as exc:
+                except Exception as exc:
                     prof_error = exc
+                    # Print the actual error before it gets wrapped
+                    import traceback
+                    print("\n" + "="*60)
+                    print("[Trainer] ERROR during training:")
+                    print("="*60)
+                    traceback.print_exc()
+                    print("="*60 + "\n")
                     raise
                 finally:
                     if profiler is not None:

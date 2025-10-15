@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from contextlib import contextmanager
 import torch
 import torch.distributed as dist
@@ -11,6 +12,15 @@ def is_dist() -> bool:
     return dist.is_available() and dist.is_initialized()
 
 
+def _safe_excepthook(exc_type, exc_value, exc_traceback):
+    """
+    Safe exception hook that doesn't try to call dist.get_rank() 
+    when the process group is not initialized.
+    """
+    # Just print the exception normally
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+
 def init_distributed_if_needed(ddp: bool) -> None:
     """Initialize distributed process group if DDP is enabled.
     
@@ -18,6 +28,10 @@ def init_distributed_if_needed(ddp: bool) -> None:
         ddp: Whether to enable distributed data parallel training
     """
     if not ddp:
+        # Override PyTorch's distributed exception hook to prevent errors
+        # when process group is not initialized
+        if hasattr(dist, 'distributed_c10d') and hasattr(dist.distributed_c10d, '_distributed_excepthook'):
+            sys.excepthook = _safe_excepthook
         return
     
     if dist.is_available() and dist.is_initialized():
@@ -44,6 +58,8 @@ def init_distributed_if_needed(ddp: bool) -> None:
     except Exception as e:
         print(f"[Distributed] Failed to initialize process group with backend={backend}: {e}")
         print("[Distributed] Continuing without DDP...")
+        # Override exception hook to prevent cascading errors
+        sys.excepthook = _safe_excepthook
         # Don't re-raise - let the code continue without DDP
 
 def get_rank() -> int:

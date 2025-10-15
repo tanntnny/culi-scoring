@@ -29,14 +29,28 @@ def train_one_epoch(model, task, loader, optimizer, scheduler, device, amp, grad
         log_memory_usage(device, step=0)
     
     for i, batch in enumerate(loader):
-        batch = batch.to(device)
-        with autocast:
-            out = task.training_step(batch, model)
-            loss = out["train/loss"] / grad_accum
-        if scaler.is_enabled():
-            scaler.scale(loss).backward()
-        else:
-            loss.backward()
+        try:
+            batch = batch.to(device)
+            with autocast:
+                out = task.training_step(batch, model)
+                loss = out["train/loss"] / grad_accum
+            if scaler.is_enabled():
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
+        except Exception as e:
+            print(f"\n[Loop] Error at batch {i}:")
+            print(f"  Error type: {type(e).__name__}")
+            print(f"  Error message: {str(e)}")
+            if hasattr(batch, 'inputs'):
+                print(f"  Batch inputs keys: {list(batch.inputs.keys())}")
+                for key, val in batch.inputs.items():
+                    if hasattr(val, 'shape'):
+                        print(f"    {key}: shape={val.shape}, dtype={val.dtype}")
+                    else:
+                        print(f"    {key}: {type(val)} = {val}")
+            raise
+            
         if logger is not None and hasattr(logger, "log_progress") and (i + 1) % log_every_n == 0:
             logger.log_progress(
                 "train",
