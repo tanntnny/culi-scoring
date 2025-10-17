@@ -16,8 +16,6 @@ class FinetuneLoRATask(BaseTask):
     def setup(self, model = None) -> None:
         self._criterion = nn.CrossEntropyLoss()
         self.metrics = Accuracy()
-        model.freeze_all_except_lora()
-        model.unfreeze_head()
 
     def training_step(self, batch: Batch, model: ModelModule) -> Dict[str, torch.Tensor]:
         out = model(**batch.inputs)
