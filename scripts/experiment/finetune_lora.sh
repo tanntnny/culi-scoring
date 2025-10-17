@@ -13,7 +13,6 @@
 set -euo pipefail
 module load Mamba/23.11.0-0
 conda activate ai-env
-python -c "import hydra; print(hydra.__version__)"
 
 mkdir -p logs
 
@@ -25,9 +24,6 @@ export PYTHONFAULTHANDLER=1
 
 # Unbuffered output for real-time logging
 export PYTHONUNBUFFERED=1
-
-# Prevent using ~/.local packages !!
-export PYTHONNOUSERSITE=1
 
 # Set number of threads for various libraries
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
