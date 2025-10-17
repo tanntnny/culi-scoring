@@ -20,7 +20,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.get("verbose", False):
         print_cfg(cfg)
     
-    if cmd == "train":
+    if cmd == "train" and cfg.train.get("use_hf_trainer", False) == False:
         Trainer(cfg).fit()
     elif cmd == "eval":
         Evaluator(cfg).run()
