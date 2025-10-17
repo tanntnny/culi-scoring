@@ -1,4 +1,4 @@
 name: phi4
 src: models/phi4/phi4-model
 lora_src: models/phi4/phi4-model/speech-lora
-torch_dtype: bfloat16  # Changed from float16 to bfloat16 for better stability and memory
+torch_dtype: bfloat16

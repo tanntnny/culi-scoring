@@ -1,11 +1,11 @@
-from transformers import AutoModelForCasualLM
+from transformers import AutoModelForCausalLM
 from peft import PeftModel
 
 from ..core.registry import register
 
 @register("model", "phi4")
 def build_phi4mm_model(cfg):
-    model = AutoModelForCasualLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         cfg.model.src,
         trust_remote_code=True,
         torch_dtype=cfg.model.torch_dtype,

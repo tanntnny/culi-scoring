@@ -1,13 +1,3 @@
-# phi4_data.py
-# A tidy, trainer-friendly Phi-4 multimodal data module:
-# - Correct loss masking (prompt masked; answer padding masked)
-# - Attention mask extends with targets' attention (not all ones)
-# - Lazy audio loading (faster startup, lower RAM)
-# - Float32 audio read
-# - Optional inclusion of per-sample "text" in the prompt
-# - Optional semantic label outputs ("A20"/"B11"/...) vs numeric ("0"/"1"/...)
-# - Stable val/test samplers (no shuffle, no drop)
-
 from __future__ import annotations
 
 import torch
@@ -45,11 +35,10 @@ class Phi4DMConfig:
     batch: int | None = None
     test: Optional[str] = None
     num_workers: Optional[int] = None
-    # Optional knobs
-    include_sample_text: bool = False        # include the row's "text" file contents in the user prompt
-    use_semantic_label_text: bool = True     # target strings: "A20"/"B11"/... (True) vs "0"/"1"/... (False)
-    answer_suffix: str = "<|end|>"           # end token appended to target text
-    # If your tokenizer requires an extra end token, set to "<|end|><|endoftext|>"
+    # Optional
+    include_sample_text: bool = False
+    use_semantic_label_text: bool = True
+    answer_suffix: str = "<|end|>"
 
 
 # ---------------- Collator ----------------
@@ -150,13 +139,6 @@ class Phi4Collator:
 # ---------------- Dataset ----------------
 
 class Phi4Dataset(Dataset):
-    """
-    Lazily loads audio/text per item. Expects CSV columns: audio, text, label, id
-    - audio: path to wav/flac/...
-    - text: path to a UTF-8 text file (optional but required by schema)
-    - label: semantic string ("A20", "B11", "B12", "B20")
-    - id: arbitrary sample id
-    """
     def __init__(self, csv_path: str | Path):
         csv_path = str(csv_path)
         df = pd.read_csv(csv_path)
@@ -177,18 +159,15 @@ class Phi4Dataset(Dataset):
         if label_str not in LABEL_MAPPING:
             raise ValueError(f"Unknown label '{label_str}' at index {idx}. Update LABEL_MAPPING.")
 
-        # Lazy load audio/text
         audio, sample_rate = self._read_audio(audio_path)
         text_content = self._read_text(text_path)
 
         sample = Sample()
         sample.inputs = {
-            "audio": audio,                 # float32 numpy array or torch tensor; processor will accept numpy
-            "sample_rate": int(sample_rate),
-            "text": text_content,
+            "audio": audio,
         }
         sample.outputs = {
-            "label": LABEL_MAPPING[label_str],  # integer id used for metrics
+            "label": LABEL_MAPPING[label_str],
         }
         sample.meta = {
             "id": sample_id,
@@ -210,7 +189,6 @@ class Phi4Dataset(Dataset):
 
     @staticmethod
     def _read_audio(file_path: str | Path) -> Tuple[Any, int]:
-        # Float32 for downstream stability; processor usually handles normalization/resampling
         audio, sr = sf.read(str(file_path), dtype="float32")
         return audio, sr
 
@@ -222,7 +200,6 @@ class Phi4DataModule(DataModule):
     Provides train/val/test dataloaders for Phi-4 MM training.
     """
     def __init__(self, cfg):
-        # Accepts a hierarchical cfg (e.g., OmegaConf). We normalize into our dataclass.
         dm_cfg = Phi4DMConfig(**cfg.data)
         dm_cfg.batch = cfg.train.batch
         dm_cfg.num_workers = cfg.train.num_workers
@@ -234,7 +211,6 @@ class Phi4DataModule(DataModule):
         self.val_sampler = None
         self.test_sampler = None
 
-    # Helper to build a DataLoader with consistent flags
     def _make_loader(self, dataset: Dataset, sampler, shuffle: bool) -> DataLoader:
         nw = int(self.config.num_workers or 0)
         return DataLoader(
@@ -246,14 +222,13 @@ class Phi4DataModule(DataModule):
             num_workers=nw,
             pin_memory=True,
             persistent_workers=(nw > 0),
-            drop_last=False,   # we control dropping via the sampler where needed
+            drop_last=False,
         )
 
     def train_dataloader(self):
         dataset = Phi4Dataset(self.config.train)
         self.train_sampler = None
         if is_dist():
-            # Train: shuffle & drop_last for even shards
             self.train_sampler = DistributedSampler(
                 dataset,
                 shuffle=True,
@@ -265,7 +240,6 @@ class Phi4DataModule(DataModule):
         dataset = Phi4Dataset(self.config.val)
         self.val_sampler = None
         if is_dist():
-            # Val: stable ordering, do not drop
             self.val_sampler = DistributedSampler(
                 dataset,
                 shuffle=False,
@@ -279,7 +253,6 @@ class Phi4DataModule(DataModule):
         dataset = Phi4Dataset(self.config.test)
         self.test_sampler = None
         if is_dist():
-            # Test: stable ordering, do not drop
             self.test_sampler = DistributedSampler(
                 dataset,
                 shuffle=False,
