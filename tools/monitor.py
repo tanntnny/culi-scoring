@@ -104,6 +104,12 @@ def main() -> int:
         help="Only include files modified before this time."
     )
     parser.add_argument(
+        "--max-char",
+        type=int,
+        default=None,
+        help="Maximum characters per line when printing file contents; truncate with '...' if exceeded."
+    )
+    parser.add_argument(
         "--cat", "-c",
         action="store_true",
         help="Print the contents of the listed files."
@@ -157,7 +163,16 @@ def main() -> int:
                     try:
                         with open(path, 'r', encoding='utf-8') as f:
                             print(f"---------------- {path} ----------------")
-                            print(f.read())
+                            content = f.read()
+                            if args.max_char is not None:
+                                lines = content.splitlines()
+                                processed_lines = []
+                                for line in lines:
+                                    if len(line) > args.max_char:
+                                        line = line[:args.max_char] + "..."
+                                    processed_lines.append(line)
+                                content = "\n".join(processed_lines)
+                            print(content)
                     except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
                         print(f"<Error reading file: {e}>")
             except (FileNotFoundError, PermissionError):
