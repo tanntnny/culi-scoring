@@ -13,6 +13,7 @@
 set -euo pipefail
 module load Mamba/23.11.0-0
 conda activate ai-env
+pip list
 mkdir -p logs
 
 # NCCL and PyTorch distributed settings (fixed deprecated variables)
