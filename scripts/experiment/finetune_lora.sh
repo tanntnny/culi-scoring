@@ -13,7 +13,7 @@
 set -euo pipefail
 module load Mamba/23.11.0-0
 conda activate ai-env
-which python
+python -c "import hydra; print(hydra.__version__)"
 
 mkdir -p logs
 
