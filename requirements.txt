@@ -4,6 +4,7 @@ torchaudio
 transformers
 tensorboard
 
+hydra
 accelerate
 soundfile
 pillow
