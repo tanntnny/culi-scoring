@@ -10,7 +10,8 @@ def build_phi4mm_model(cfg):
         trust_remote_code=True,
         torch_dtype=cfg.model.torch_dtype,
         device_map="auto",
-        attn_implementation="flash_attention" if cfg.model.use_flash_attention else "default",
+        attn_implementation="flash_attention_2" if cfg.model.use_flash_attention else "default",
+        _attn_implementation="flash_attention_2" if cfg.model.use_flash_attention else "default",
     )
     model = PeftModel.from_pretrained(
         model,
