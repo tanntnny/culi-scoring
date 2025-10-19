@@ -9,6 +9,7 @@ from .downloads.download import run_download
 from .core.seed import seed_everything
 from .core.discover import discover_default
 from .core.logging import print_cfg
+from .core.registry import build
 
 @hydra.main(version_base=None, config_path="../configs", config_name="defaults")
 def main(cfg: DictConfig) -> None:
@@ -22,6 +23,9 @@ def main(cfg: DictConfig) -> None:
     
     if cmd == "train" and cfg.train.get("use_hf_trainer", False) == False:
         Trainer(cfg).fit()
+    elif cmd == "hftrain":
+        hf_trainer = build("trainer", "hf", cfg=cfg)
+        hf_trainer.fit()
     elif cmd == "eval":
         Evaluator(cfg).run()
     elif cmd == "pipeline":

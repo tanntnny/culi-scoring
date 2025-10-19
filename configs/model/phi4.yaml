@@ -3,3 +3,4 @@ src: models/phi4/phi4-model
 lora_src: models/phi4/phi4-model/speech-lora
 torch_dtype: bfloat16
 use_flash_attention: true
+gradient_checkpointing: true
