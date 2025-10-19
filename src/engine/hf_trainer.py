@@ -52,6 +52,69 @@ class HuggingFaceTrainer:
         # Logger for distributed training
         self.logger = Logger(Path(self.cfg.output_dir) / "tb") if is_global_zero() else None
 
+    def _move_to_device(self, obj, device):
+        """Recursively move tensors in a nested structure to the given device."""
+        if isinstance(obj, torch.Tensor):
+            return obj.to(device, non_blocking=True)
+        if isinstance(obj, dict):
+            return {k: self._move_to_device(v, device) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            t = [self._move_to_device(v, device) for v in obj]
+            return type(obj)(t) if isinstance(obj, tuple) else t
+        return obj
+
+    def _pre_training_profile(self):
+        """Run a short profiling warm-up before the main training loop."""
+        # Guard clauses for config presence
+        prof_cfg = getattr(self.cfg.train, "profiler", None)
+        if prof_cfg is None:
+            return
+        enabled = bool(prof_cfg.get("enabled", True))
+        pre_steps = int(prof_cfg.get("pre_steps", 0))
+        if (not enabled) or pre_steps <= 0:
+            return
+
+        if is_global_zero():
+            print(f"[HFTrainer] Running pre-training profiler for {pre_steps} step(s)...")
+
+        do_backward = bool(prof_cfg.get("pre_backward", True))
+        profiler = TrainingProfiler(prof_cfg, logger=self.logger)
+
+        # Use the datamodule's train dataloader for realistic batches
+        dl = self.datamodule.train_dataloader()
+        self.model.train()
+
+        step = 0
+        profiler.start_epoch(epoch_index=0, global_step_start=0)
+        try:
+            for batch in dl:
+                batch = self._move_to_device(batch, self.device)
+                outputs = self.model(**batch)
+                loss = getattr(outputs, "loss", None)
+                if do_backward and loss is not None:
+                    loss.backward()
+                    # Clear grads to avoid accumulation across warm-up
+                    if hasattr(self.model, "zero_grad"):
+                        self.model.zero_grad(set_to_none=True)
+
+                step += 1
+                profiler.step()
+                if step >= pre_steps:
+                    break
+        except Exception as e:
+            if is_global_zero():
+                print(f"[HFTrainer] Pre-training profiler encountered an error: {e}")
+            # Still attempt to properly close/stop the profiler
+            profiler.stop_epoch(epoch_index=0, global_step_end=step, error=e)
+            profiler.close()
+            raise
+        else:
+            profiler.stop_epoch(epoch_index=0, global_step_end=step)
+            profiler.close()
+
+        # Sync ranks before proceeding to main training
+        barrier()
+
     def _setup_trainer(self):
         """Setup HuggingFace Trainer with configuration."""
         # Get HF trainer config
@@ -203,6 +266,9 @@ class HuggingFaceTrainer:
             if is_global_zero():
                 print("[HFTrainer] Starting training...")
                 
+            # 1) Optional short profiling warm-up before the actual training
+            self._pre_training_profile()
+
             # Check for checkpoints
             resume_from_checkpoint = None
             if self.cfg.train.hf_trainer.get("resume_from_checkpoint"):

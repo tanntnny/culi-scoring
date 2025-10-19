@@ -86,11 +86,7 @@ class Phi4Collator:
             truncation=True,
         )
 
-        # 4) Encode targets
-        if self.cfg.use_semantic_label_text:
-            labels_as_text = [LABEL_MAPPING[i] for i in original_label_ints]
-        else:
-            labels_as_text = [str(i) for i in original_label_ints]
+        labels_as_text = [i for i in original_label_ints]
 
         answers = [f"{y}" for y in labels_as_text]
         targets = self.processor(
