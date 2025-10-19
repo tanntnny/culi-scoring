@@ -253,9 +253,3 @@ class HuggingFaceTrainer:
             self.logger.info(f"Prediction completed. Predictions shape: {predictions.predictions.shape}")
             
         return predictions
-
-
-@register("trainer", "hf")
-def build_hf_trainer(cfg):
-    """Builder function for HuggingFace trainer."""
-    return HuggingFaceTrainer(cfg)

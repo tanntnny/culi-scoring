@@ -4,6 +4,7 @@ import hydra
 from omegaconf import DictConfig
 from .engine.trainer import Trainer
 from .engine.evaluator import Evaluator
+from .engine.hf_trainer import HuggingFaceTrainer
 from .pipeline.pipeline import run_pipeline
 from .downloads.download import run_download
 from .core.seed import seed_everything
@@ -24,8 +25,7 @@ def main(cfg: DictConfig) -> None:
     if cmd == "train" and cfg.train.get("use_hf_trainer", False) == False:
         Trainer(cfg).fit()
     elif cmd == "hftrain":
-        hf_trainer = build("trainer", "hf", cfg=cfg)
-        hf_trainer.fit()
+        HuggingFaceTrainer(cfg).fit()
     elif cmd == "eval":
         Evaluator(cfg).run()
     elif cmd == "pipeline":
