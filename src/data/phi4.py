@@ -133,7 +133,19 @@ class Phi4Collator:
         }
         batch.meta = [s.meta for s in samples]
 
-        return batch
+        # The HuggingFace Trainer expects a dictionary.
+        # The model inputs are in batch.inputs.
+        # We add the classification labels to this dictionary for metric computation.
+        # The key 'labels' in batch.inputs is for the Causal LM task.
+        # The key 'clf_labels' is for our classification metric.
+        # The Trainer will automatically use 'clf_labels' for metric computation
+        # if it's not a model input.
+        # We also need to rename the 'labels' from the model to something else
+        # to avoid conflict.
+        final_inputs = batch.inputs
+        final_inputs["clf_labels"] = batch.outputs["labels"]
+        
+        return final_inputs
 
 
 # ---------------- Dataset ----------------

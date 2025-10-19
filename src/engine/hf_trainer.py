@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 import torch
+import numpy as np
+from transformers import EvalPrediction
 from transformers import (
     Trainer as HFTrainer,
     TrainingArguments,
@@ -80,7 +82,7 @@ class HuggingFaceTrainer:
             bf16=hf_config.bf16,
             tf32=hf_config.tf32,
             gradient_checkpointing=hf_config.gradient_checkpointing,
-            gradient_checkpointing_kwargs=hf_config.get("gradient_checkpointing_kwargs", {}),
+            gradient_checkpointing_kwargs=dict(hf_config.get("gradient_checkpointing_kwargs", {})),
             
             # Gradient clipping
             max_grad_norm=hf_config.max_grad_norm,
@@ -152,11 +154,34 @@ class HuggingFaceTrainer:
         
         # Get collate function from datamodule
         data_collator = None
-        if hasattr(self.datamodule, 'collate_fn'):
+        if hasattr(self.datamodule, "collator"):
+            data_collator = self.datamodule.collator
+        elif hasattr(self.datamodule, 'collate_fn'):
             data_collator = self.datamodule.collate_fn
-        elif hasattr(self.datamodule.train_dataloader().dataset, 'collate_fn'):
-            data_collator = self.datamodule.train_dataloader().dataset.collate_fn
+        elif hasattr(self.datamodule.train_dataloader(), 'collate_fn'):
+            data_collator = self.datamodule.train_dataloader().collate_fn
+
         
+
+        def compute_metrics(p: EvalPrediction):
+            # The model may return a tuple of predictions.
+            # We take the first element.
+            preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+            
+            # The predictions are logits, so we take the argmax to get the predicted class.
+            preds = np.argmax(preds, axis=1)
+            
+            # The label_ids are the ground truth labels.
+            # In our case, this corresponds to the 'clf_labels' we added to the batch.
+            # The Trainer automatically handles this.
+            
+            # The label_ids may be a tuple if multiple columns are not used as model inputs.
+            # We assume the first element is our classification labels.
+            labels = p.label_ids[0] if isinstance(p.label_ids, tuple) else p.label_ids
+
+            accuracy = (preds == labels).astype(np.float32).mean().item()
+            return {"accuracy": accuracy}
+
         # Create HF Trainer
         self.trainer = HFTrainer(
             model=self.model,
@@ -165,6 +190,7 @@ class HuggingFaceTrainer:
             eval_dataset=eval_dataset,
             data_collator=data_collator,
             callbacks=callbacks,
+            compute_metrics=compute_metrics,
         )
         
         # Apply task-specific setup to trainer if needed
