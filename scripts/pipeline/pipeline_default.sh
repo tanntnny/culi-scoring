@@ -15,6 +15,7 @@ set -euo pipefail
 
 # ---------------- Environment / Modules ----------------
 set -euo pipefail
+module load FFmpeg/6.0.1-cpeCray-23.03
 module load Mamba/23.11.0-0
 module load cuda/12.6
 module load gcc/12.2.0
