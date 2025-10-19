@@ -1,6 +1,3 @@
-# @package _global_
-# Hugging Face Trainer Configuration
-
 # Optimizer settings
 optimizer: adamw
 lr: 1e-4
