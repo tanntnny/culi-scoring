@@ -14,8 +14,6 @@ from ..core.registry import build, register
 from ..core.logging import Logger
 from ..core.distributed import init_distributed_if_needed, is_global_zero, cleanup_distributed, is_dist, barrier
 from ..core.profiler import TrainingProfiler
-from ..data.collate import collate_fn
-
 
 class HuggingFaceTrainer:
     """
