@@ -14,9 +14,11 @@
 set -euo pipefail
 
 # ---------------- Environment / Modules ----------------
-module load FFmpeg/6.0.1-cpeCray-23.03
+set -euo pipefail
 module load Mamba/23.11.0-0
-conda activate pytorch-2.2.2
+module load cuda/12.6
+module load gcc/12.2.0
+conda activate ai-env
 
 mkdir -p logs
 

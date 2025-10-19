@@ -135,6 +135,9 @@ class HuggingFaceTrainer:
             
             # Model saving format
             save_safetensors=hf_config.save_safetensors,
+
+            # Profiling
+            profiler=hf_config.profiler,
         )
         
         # Get datasets
