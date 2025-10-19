@@ -57,4 +57,4 @@ mkdir -p "$HF_HOME" "$HF_DATASETS_CACHE" "$TORCH_HOME" "$WANDB_DIR" "$XDG_CACHE_
 
 # ---------------- Launch HuggingFace Trainer ----------------
 srun --kill-on-bad-exit=1 --gpu-bind=none \
-  python -m src.main cmd=hftrain train=hftrain data=phi4 model=phi4 task=finetune_lora ddp=True
+  python -m src.main cmd=hftrain train=hf_train data=phi4 model=phi4 task=finetune_lora ddp=True

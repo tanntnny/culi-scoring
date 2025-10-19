@@ -83,6 +83,7 @@ hf_trainer:
   # Reporting
   report_to: "tensorboard"
   logging_dir: "./outputs/hf_training/logs"
+  disable_tqdm: true
   
   # Advanced settings
   push_to_hub: false
