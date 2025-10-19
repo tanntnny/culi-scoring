@@ -202,11 +202,11 @@ class Phi4DataModule(DataModule):
     Provides train/val/test dataloaders for Phi-4 MM training.
     """
     def __init__(self, cfg):
-        dm_cfg = Phi4DMConfig(**cfg.data)
-        dm_cfg.batch = cfg.train.batch
-        dm_cfg.num_workers = cfg.train.num_workers
+        self.dm_config = Phi4DMConfig(**cfg.data)
+        self.dm_config.batch = cfg.train.batch
+        self.dm_config.num_workers = cfg.train.num_workers
 
-        self.config = dm_cfg
+        self.config = cfg
         self.collator = Phi4Collator(cfg=self.config, src=cfg.model.src)
 
         self.train_sampler = None
@@ -217,7 +217,7 @@ class Phi4DataModule(DataModule):
         nw = int(self.config.num_workers or 0)
         return DataLoader(
             dataset,
-            batch_size=self.config.batch,
+            batch_size=self.dm_config.batch,
             sampler=sampler,
             shuffle=shuffle if sampler is None else False,
             collate_fn=self.collator,
