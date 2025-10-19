@@ -207,14 +207,14 @@ class Phi4DataModule(DataModule):
         self.dm_config.num_workers = cfg.train.num_workers
 
         self.config = cfg
-        self.collator = Phi4Collator(cfg=self.config, src=cfg.model.src)
+        self.collator = Phi4Collator(cfg=self.dm_config, src=cfg.model.src)
 
         self.train_sampler = None
         self.val_sampler = None
         self.test_sampler = None
 
     def _make_loader(self, dataset: Dataset, sampler, shuffle: bool) -> DataLoader:
-        nw = int(self.config.num_workers or 0)
+        nw = int(self.dm_config.num_workers or 0)
         return DataLoader(
             dataset,
             batch_size=self.dm_config.batch,
