@@ -32,6 +32,10 @@ class EDASoundfile:
             durations_series = pd.Series(durations)
             print("\nDuration Statistics:")
             print(durations_series.describe())
+        
+        cap_duration = self.cfg.pipeline.get("audio_cap_duration", 60.0)
+        above_cap = sum(durations_series > cap_duration)
+        print(f"Number of audio files above {cap_duration} seconds: {above_cap}")
 
 @register("pipeline", "eda_soundfile")
 def build_eda_soundfile(cfg):

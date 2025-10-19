@@ -9,6 +9,7 @@ encoder: models/wav2vec2/wav2vec2-processor
 target_sample_rate: 16000
 audio_sample_rate: 16000
 logmel_sample_rate: 16000
+audio_cap_duration: 60.0  # in seconds
 
 # ---------------- Phi4 Preference ----------------
 logmel_n: 80

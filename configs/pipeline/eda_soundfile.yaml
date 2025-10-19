@@ -1,2 +1,3 @@
 name: eda_soundfile
 src: datasets/processed/SM-preprocessed/dataset.csv
+audio_cap_duration: 60.0  # in seconds
