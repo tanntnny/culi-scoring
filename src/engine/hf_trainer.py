@@ -48,7 +48,7 @@ class HuggingFaceTrainer:
         self._setup_trainer()
         
         # Logger for distributed training
-        self.logger = Logger() if is_global_zero() else None
+        self.logger = Logger(Path(self.cfg.output_dir) / "tb") if is_global_zero() else None
 
     def _setup_trainer(self):
         """Setup HuggingFace Trainer with configuration."""
