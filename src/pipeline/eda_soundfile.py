@@ -6,7 +6,7 @@ from ..core.registry import register
 class EDASoundfile:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.df = pd.read_csv(self.cfg.src)
+        self.df = pd.read_csv(self.cfg.pipeline.src)
         self._ensure_columns(self.df)
 
     def _ensure_columns(self, df: pd.DataFrame):
