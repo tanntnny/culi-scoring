@@ -81,7 +81,7 @@ hf_trainer:
   remove_unused_columns: false
   
   # Reporting
-  report_to: ["tensorboard"]
+  report_to: "tensorboard"
   logging_dir: "./outputs/hf_training/logs"
   
   # Advanced settings
