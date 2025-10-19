@@ -134,6 +134,7 @@ class HuggingFaceTrainer:
             
             # Model saving format
             save_safetensors=hf_config.save_safetensors,
+            label_names=["clf_labels"],
         )
         
         # Get datasets

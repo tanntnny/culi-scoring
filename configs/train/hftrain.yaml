@@ -78,7 +78,7 @@ hf_trainer:
   
   # Memory optimization
   dataloader_drop_last: true
-  remove_unused_columns: false
+  remove_unused_columns: true
   
   # Reporting
   report_to: "tensorboard"
