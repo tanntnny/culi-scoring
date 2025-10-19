@@ -51,13 +51,11 @@ class Phi4Collator:
             trust_remote_code=True,
         )
 
-    def _prompt(self, sample_text: Optional[str] = None) -> str:
+    def _prompt(self) -> str:
         # Build the assistant turn with audio placeholder and optional sample text
         # Example:
         # <|user|><|audio_1|>Classify the respiratory sound... \n <sample_text> <|end|><|assistant|>
         body = self.cfg.instruction
-        if self.cfg.include_sample_text and sample_text:
-            body = f"{body}\n{sample_text}"
         return f"<|user|><|audio_1|>{body}<|end|><|assistant|>"
 
     def __call__(self, samples: List[Sample]) -> Batch:
@@ -76,7 +74,7 @@ class Phi4Collator:
         original_label_ints: List[int] = [int(s.outputs["label"]) for s in samples]
 
         # 2) Build prompts
-        prompts = [self._prompt(t) for t in sample_texts]
+        prompts = [self._prompt() for t in sample_texts]
 
         # 3) Encode inputs (prompt + audio)
         # truncation=True applies to text length; processor handles audio features internally.
@@ -90,13 +88,11 @@ class Phi4Collator:
 
         # 4) Encode targets
         if self.cfg.use_semantic_label_text:
-            # Teach the model to emit "A20"/"B11"/...
-            labels_as_text = [INV_LABEL_MAPPING[i] for i in original_label_ints]
+            labels_as_text = [LABEL_MAPPING[i] for i in original_label_ints]
         else:
-            # Teach the model to emit numeric ids "0"/"1"/...
             labels_as_text = [str(i) for i in original_label_ints]
 
-        answers = [f"{y}{self.cfg.answer_suffix}" for y in labels_as_text]
+        answers = [f"{y}" for y in labels_as_text]
         targets = self.processor(
             text=answers,
             return_tensors="pt",
