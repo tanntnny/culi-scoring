@@ -271,7 +271,7 @@ class ICNALEPipeline(BasePipeline):
         
         for i, f in enumerate(files):
             # Progress reporting every 50 files
-            if (i + 1) % 50 == 0 or i == 0:
+            if (i + 1) % 500 == 0 or i == 0:
                 print(f"Progress: {i+1}/{total_files} files ({((i+1)/total_files)*100:.1f}%)")
             
             _, ext = os.path.splitext(f)
