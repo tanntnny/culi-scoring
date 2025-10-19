@@ -228,7 +228,7 @@ class Phi4DataModule(DataModule):
         )
 
     def train_dataloader(self):
-        dataset = Phi4Dataset(self.config.train)
+        dataset = Phi4Dataset(self.dm_config.train)
         self.train_sampler = None
         if is_dist():
             self.train_sampler = DistributedSampler(
@@ -239,7 +239,7 @@ class Phi4DataModule(DataModule):
         return self._make_loader(dataset, self.train_sampler, shuffle=True)
 
     def val_dataloader(self):
-        dataset = Phi4Dataset(self.config.val)
+        dataset = Phi4Dataset(self.dm_config.val)
         self.val_sampler = None
         if is_dist():
             self.val_sampler = DistributedSampler(
@@ -252,7 +252,7 @@ class Phi4DataModule(DataModule):
     def test_dataloader(self):
         if not self.config.test:
             return None
-        dataset = Phi4Dataset(self.config.test)
+        dataset = Phi4Dataset(self.dm_config.test)
         self.test_sampler = None
         if is_dist():
             self.test_sampler = DistributedSampler(
