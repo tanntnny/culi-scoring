@@ -164,6 +164,67 @@ class ICNALEPipeline(BasePipeline):
         
         return filtered_files
 
+    def filter_by_audio_duration(self, files):
+        """Remove files where audio duration exceeds audio_cap_duration"""
+        audio_cap_duration = getattr(self.cfg.pipeline, 'audio_cap_duration', None)
+        if audio_cap_duration is None:
+            print("No audio_cap_duration specified, skipping duration filtering...")
+            return files
+            
+        print(f"Filtering audio files by duration (max: {audio_cap_duration} seconds)...")
+        
+        # Separate audio and text files
+        audio_files = []
+        text_files = []
+        for f in files:
+            _, ext = os.path.splitext(f)
+            if ext.lower() in [".wav", ".mp3", ".flac", ".m4a"]:
+                audio_files.append(f)
+            else:
+                text_files.append(f)
+        
+        # Check audio duration and collect valid IDs
+        valid_ids = set()
+        filtered_audio_files = []
+        removed_count = 0
+        
+        for audio_file in audio_files:
+            try:
+                # Get audio duration using soundfile
+                audio_info = sf.info(audio_file)
+                duration = audio_info.duration  # Duration in seconds
+                
+                if duration <= audio_cap_duration:
+                    valid_ids.add(get_id_from_icnale(audio_file))
+                    filtered_audio_files.append(audio_file)
+                else:
+                    removed_count += 1
+                    print(f"Removed audio file (duration {duration:.2f}s > {audio_cap_duration}s): {Path(audio_file).name}")
+            
+            except Exception as e:
+                print(f"Warning: Could not read audio file {audio_file}: {e}")
+                removed_count += 1
+                continue
+        
+        # Filter text files to only include those with matching valid audio IDs
+        filtered_text_files = []
+        for text_file in text_files:
+            text_id = get_id_from_icnale(text_file)
+            if text_id in valid_ids:
+                filtered_text_files.append(text_file)
+            else:
+                removed_count += 1
+                print(f"Removed text file (no matching valid audio): {Path(text_file).name}")
+        
+        filtered_files = filtered_audio_files + filtered_text_files
+        
+        print(f"Duration filtering complete:")
+        print(f"  - Original files: {len(files)}")
+        print(f"  - Removed files: {removed_count}")
+        print(f"  - Remaining files: {len(filtered_files)}")
+        
+        return filtered_files
+
     def run(self):
         print("Starting ICNALE pipeline processing...")
         
@@ -175,6 +236,9 @@ class ICNALEPipeline(BasePipeline):
         
         # Filter out files with inconsistent labels
         files = self.filter_inconsistent_labels(files)
+        
+        # Filter out files based on audio duration
+        files = self.filter_by_audio_duration(files)
         
         if len(files) == 0:
             print("ERROR: No valid files found after filtering!")

@@ -66,7 +66,7 @@ class HuggingFaceTrainer:
             per_device_train_batch_size=hf_config.per_device_train_batch_size,
             per_device_eval_batch_size=hf_config.per_device_eval_batch_size,
             gradient_accumulation_steps=hf_config.gradient_accumulation_steps,
-            
+
             # Learning rate and scheduling
             learning_rate=hf_config.learning_rate,
             weight_decay=hf_config.weight_decay,
@@ -96,6 +96,7 @@ class HuggingFaceTrainer:
             logging_strategy=hf_config.logging_strategy,
             logging_steps=hf_config.logging_steps,
             logging_first_step=hf_config.logging_first_step,
+            disable_tqdm=hf_config.disable_tqdm,
             
             # Saving
             save_strategy=hf_config.save_strategy,
