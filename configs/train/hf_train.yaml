@@ -92,6 +92,3 @@ hf_trainer:
   
   # Model saving format
   save_safetensors: true
-
-  # Profiling
-  profiler: "pytorch"
