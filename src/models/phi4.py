@@ -3,6 +3,7 @@ from peft import PeftModel
 
 from ..core.registry import register
 
+# ---------------- Phi4MM ----------------
 @register("model", "phi4")
 def build_phi4mm_model(cfg):
     model = AutoModelForCausalLM.from_pretrained(

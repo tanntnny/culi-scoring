@@ -165,6 +165,8 @@ class Phi4Dataset(Dataset):
         sample = Sample()
         sample.inputs = {
             "audio": audio,
+            "sample_rate": sample_rate,
+            "text": text_content,
         }
         sample.outputs = {
             "label": LABEL_MAPPING[label_str],
