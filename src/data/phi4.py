@@ -143,7 +143,6 @@ class Phi4Collator:
         # We also need to rename the 'labels' from the model to something else
         # to avoid conflict.
         final_inputs = batch.inputs
-        final_inputs["clf_labels"] = batch.outputs["labels"]
         
         return final_inputs
 
