@@ -83,16 +83,37 @@ class HuggingFaceTrainer:
         # Use the datamodule's train dataloader for realistic batches
         dl = self.datamodule.train_dataloader()
         self.model.train()
+        # Enable gradient checkpointing during warm-up if configured
+        try:
+            if bool(getattr(self.cfg.train.hf_trainer, "gradient_checkpointing", False)):
+                if hasattr(self.model, "gradient_checkpointing_enable"):
+                    self.model.gradient_checkpointing_enable()
+        except Exception:
+            pass
 
         step = 0
         profiler.start_epoch(epoch_index=0, global_step_start=0)
         try:
+            use_fp16 = bool(getattr(self.cfg.train.hf_trainer, "fp16", False))
+            use_bf16 = bool(getattr(self.cfg.train.hf_trainer, "bf16", False))
+            use_amp = (use_fp16 or use_bf16) and (self.device.type == "cuda")
+            amp_dtype = torch.float16 if use_fp16 else (torch.bfloat16 if use_bf16 else None)
+
             for batch in dl:
                 batch = self._move_to_device(batch, self.device)
-                outputs = self.model(**batch)
-                loss = getattr(outputs, "loss", None)
+                if use_amp and amp_dtype is not None:
+                    with torch.autocast(device_type="cuda", dtype=amp_dtype):
+                        outputs = self.model(**batch)
+                        loss = getattr(outputs, "loss", None)
+                else:
+                    outputs = self.model(**batch)
+                    loss = getattr(outputs, "loss", None)
+
                 if do_backward and loss is not None:
-                    loss.backward()
+                    if use_amp and amp_dtype is not None:
+                        loss.backward()
+                    else:
+                        loss.backward()
                     # Clear grads to avoid accumulation across warm-up
                     if hasattr(self.model, "zero_grad"):
                         self.model.zero_grad(set_to_none=True)
@@ -198,6 +219,9 @@ class HuggingFaceTrainer:
             
             # Model saving format
             save_safetensors=hf_config.save_safetensors,
+            
+            # Deepspeed Config
+            deepspeed=(hf_config.deepspeed if hf_config.deepspeed_enabled else None),
         )        
         # Get datasets
         train_dataset = self.datamodule.train_dataloader().dataset
@@ -227,21 +251,9 @@ class HuggingFaceTrainer:
         
 
         def compute_metrics(p: EvalPrediction):
-            # The model may return a tuple of predictions.
-            # We take the first element.
             preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-            
-            # The predictions are logits, so we take the argmax to get the predicted class.
             preds = np.argmax(preds, axis=1)
-            
-            # The label_ids are the ground truth labels.
-            # In our case, this corresponds to the 'clf_labels' we added to the batch.
-            # The Trainer automatically handles this.
-            
-            # The label_ids may be a tuple if multiple columns are not used as model inputs.
-            # We assume the first element is our classification labels.
             labels = p.label_ids[0] if isinstance(p.label_ids, tuple) else p.label_ids
-
             accuracy = (preds == labels).astype(np.float32).mean().item()
             return {"accuracy": accuracy}
 
@@ -266,8 +278,8 @@ class HuggingFaceTrainer:
             if is_global_zero():
                 print("[HFTrainer] Starting training...")
                 
-            # 1) Optional short profiling warm-up before the actual training
-            self._pre_training_profile()
+            if self.cfg.profiler.get("enabled", False):
+                self._pre_training_profile()
 
             # Check for checkpoints
             resume_from_checkpoint = None

@@ -39,7 +39,5 @@ profiler:
     active: 4
     repeat: 1
     skip_first: 0
-  # Run a few steps under profiler before main training starts
   pre_steps: 0
-  # Whether to run backward() during pre-steps (set false for forward-only)
   pre_backward: true

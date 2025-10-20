@@ -3,6 +3,7 @@ torchvision
 torchaudio
 transformers
 tensorboard
+deepspeed
 
 accelerate
 soundfile
