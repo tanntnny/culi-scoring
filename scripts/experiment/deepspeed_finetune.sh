@@ -59,7 +59,7 @@ deepspeed \
   --num_gpus=$SLURM_GPUS_PER_NODE \
   --num_nodes=$SLURM_NNODES \
   --module \
-  src/main \
+  src.main \
   cmd=hftrain \
   train=hf_train \
   data=phi4 \
