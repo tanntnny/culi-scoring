@@ -58,6 +58,7 @@ mkdir -p "$HF_HOME" "$HF_DATASETS_CACHE" "$TORCH_HOME" "$WANDB_DIR" "$XDG_CACHE_
 deepspeed \
   --num_gpus=$SLURM_GPUS_PER_NODE \
   --num_nodes=$SLURM_NNODES \
+  -m \
   src/main.py \
   cmd=hftrain \
   train=hf_train \
