@@ -48,6 +48,9 @@ export HF_DATASETS_OFFLINE=1
 export HYDRA_FULL_ERROR=1
 export HYDRA_ERROR_ON_UNDEFINED_CONFIG=True
 
+# Deepspeed
+export CXX=g++
+
 # Set cache directories to project-specific paths
 export HF_HOME=/project/pv823002-ulearn/hf/misc
 export HF_DATASETS_CACHE=/project/pv823002-ulearn/hf/datasets
