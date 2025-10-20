@@ -278,7 +278,7 @@ class HuggingFaceTrainer:
             if is_global_zero():
                 print("[HFTrainer] Starting training...")
                 
-            if self.cfg.profiler.get("enabled", False):
+            if self.cfg.get("profiler", False) and self.cfg.profiler.get("enabled", False):
                 self._pre_training_profile()
 
             # Check for checkpoints
