@@ -14,8 +14,6 @@ set -euo pipefail
 module load Mamba/23.11.0-0
 module load cuda/12.6
 module load gcc/12.2.0
-module load cpe-cuda/23.09
-module load cudatoolkit/24.11_12.6
 conda activate ai-env
 
 mkdir -p logs
@@ -60,6 +58,10 @@ export WANDB_DIR=/project/pv823002-ulearn/wandb
 export XDG_CACHE_HOME=/project/pv823002-ulearn/.cache
 export TMPDIR=/scratch/pv823002-ulearn/tmp
 mkdir -p "$HF_HOME" "$HF_DATASETS_CACHE" "$TORCH_HOME" "$WANDB_DIR" "$XDG_CACHE_HOME" "$TMPDIR"
+
+echo "Clearing DeepSpeed/PyTorch build cache..."
+rm -rf $XDG_CACHE_HOME/torch_extensions
+echo "Cache cleared."
 
 deepspeed \
   --num_gpus=$SLURM_GPUS_PER_NODE \
