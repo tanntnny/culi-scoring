@@ -49,6 +49,7 @@ export HYDRA_FULL_ERROR=1
 export HYDRA_ERROR_ON_UNDEFINED_CONFIG=True
 
 # Deepspeed Specific
+export CC=gcc
 export CXX=g++
 
 # Set cache directories to project-specific paths
