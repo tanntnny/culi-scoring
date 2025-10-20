@@ -14,6 +14,8 @@ set -euo pipefail
 module load Mamba/23.11.0-0
 module load cuda/12.6
 module load gcc/12.2.0
+module load cpe-cuda/23.09
+module load cudatoolkit/24.11_12.6
 conda activate ai-env
 
 mkdir -p logs
