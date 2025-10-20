@@ -28,5 +28,6 @@
     },
     "zero_optimization": { "stage": 2, "contiguous_gradients": true },
     "train_micro_batch_size_per_gpu": "auto",
-    "train_batch_size": "auto"
+    "train_batch_size": "auto",
+    "gradient_accumulation_steps": "auto"
 }
