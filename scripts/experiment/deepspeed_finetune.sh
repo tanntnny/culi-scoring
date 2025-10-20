@@ -59,6 +59,7 @@ deepspeed \
   --num_gpus=$SLURM_GPUS_PER_NODE \
   --num_nodes=$SLURM_NNODES \
   --module \
+  --no_local_rank \
   src.main \
   cmd=hftrain \
   train=hf_train \
