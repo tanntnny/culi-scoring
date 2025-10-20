@@ -94,5 +94,5 @@ hf_trainer:
   save_safetensors: true
   
   # Deep Speed
-  deepspeed_enabled: true
+  deepspeed_enabled: false
   deepspeed: "configs/deepspeed/zero2.json"
