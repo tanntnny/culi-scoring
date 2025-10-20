@@ -59,6 +59,10 @@ export XDG_CACHE_HOME=/project/pv823002-ulearn/.cache
 export TMPDIR=/scratch/pv823002-ulearn/tmp
 mkdir -p "$HF_HOME" "$HF_DATASETS_CACHE" "$TORCH_HOME" "$WANDB_DIR" "$XDG_CACHE_HOME" "$TMPDIR"
 
+# CUDA settings
+export CUDA_HOME=/opt/nvidia/hpc_sdk/Linux_x86_64/24.11/cuda/12.6
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
 echo "Clearing DeepSpeed/PyTorch build cache..."
 rm -rf $XDG_CACHE_HOME/torch_extensions
 echo "Cache cleared."
