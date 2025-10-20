@@ -49,6 +49,11 @@ hf_trainer:
   logging_strategy: "steps"
   logging_steps: 100
   logging_first_step: true
+
+  # GPU/Host memory logging
+  log_gpu_memory: true
+  log_mem_every_n_steps: 1  # set >1 to throttle
+  log_host_memory: true
   
   # Saving
   save_strategy: "steps"

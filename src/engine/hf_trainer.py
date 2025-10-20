@@ -9,13 +9,83 @@ from transformers import (
     Trainer as HFTrainer,
     TrainingArguments,
     EarlyStoppingCallback,
-    get_scheduler
+    get_scheduler,
+    TrainerCallback
 )
 from transformers.trainer_utils import get_last_checkpoint
 from ..core.registry import build, register
 from ..core.logging import Logger
 from ..core.distributed import init_distributed_if_needed, is_global_zero, cleanup_distributed, is_dist, barrier
 from ..core.profiler import TrainingProfiler
+
+
+class GPUMemoryCallback(TrainerCallback):
+    """Logs per-GPU memory stats (and optional host RAM) at Trainer logging steps.
+
+    Configurable via:
+    - log_every_n_steps: throttle within on_log callbacks (default 1)
+    - log_host_memory: also report host RAM usage (requires psutil if available)
+    """
+
+    def __init__(self, log_every_n_steps: int = 1, log_host_memory: bool = True):
+        super().__init__()
+        self.log_every_n_steps = max(1, int(log_every_n_steps))
+        self.log_host_memory = bool(log_host_memory)
+        self._last_logged_step = -1
+
+    def on_log(self, args, state, control, **kwargs):
+        # Only the main process should log to avoid duplicate entries
+        try:
+            if not is_global_zero():
+                return
+        except Exception:
+            # If distributed utils are unavailable for any reason, proceed
+            pass
+
+        if not torch.cuda.is_available():
+            return
+
+        step = getattr(state, "global_step", None)
+        if step is None:
+            return
+        if step == self._last_logged_step:
+            return
+        if (step % self.log_every_n_steps) != 0:
+            return
+
+        trainer = kwargs.get("trainer", None)
+        if trainer is None:
+            return
+
+        logs: Dict[str, float] = {}
+        try:
+            device_count = torch.cuda.device_count()
+            for idx in range(device_count):
+                free_bytes, total_bytes = torch.cuda.mem_get_info(idx)
+                used_bytes = total_bytes - free_bytes
+                allocated = torch.cuda.memory_allocated(idx)
+                reserved = torch.cuda.memory_reserved(idx)
+
+                base = f"gpu_mem/{idx}"
+                logs[f"{base}_used_gb"] = used_bytes / (1024 ** 3)
+                logs[f"{base}_alloc_gb"] = allocated / (1024 ** 3)
+                logs[f"{base}_reserved_gb"] = reserved / (1024 ** 3)
+        except Exception:
+            # Be resilient: never break training due to logging
+            pass
+
+        if self.log_host_memory:
+            try:
+                import psutil  # optional
+                vm = psutil.virtual_memory()
+                logs["host_mem/used_gb"] = (vm.total - vm.available) / (1024 ** 3)
+                logs["host_mem/percent"] = float(vm.percent)
+            except Exception:
+                pass
+
+        if logs:
+            trainer.log(logs)
+        self._last_logged_step = step
 
 class HuggingFaceTrainer:
     """
@@ -238,6 +308,12 @@ class HuggingFaceTrainer:
                     early_stopping_threshold=hf_config.get("early_stopping_threshold", 0.0)
                 )
             )
+
+        # Optional GPU memory logging callback
+        if bool(hf_config.get("log_gpu_memory", True)):
+            log_n = int(hf_config.get("log_mem_every_n_steps", 1))
+            log_host_mem = bool(hf_config.get("log_host_memory", True))
+            callbacks.append(GPUMemoryCallback(log_every_n_steps=log_n, log_host_memory=log_host_mem))
         
         # Get collate function from datamodule
         data_collator = None
