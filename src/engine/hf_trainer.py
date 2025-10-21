@@ -79,7 +79,6 @@ class GPUMemoryCallback(TrainerCallback):
         if metrics and logs is not None:
             # Inject metrics into the current log payload so they get recorded
             logs.update(metrics)
-            print({k: round(v, 3) if isinstance(v, float) else v for k, v in metrics.items()})
 
         self._last_logged_step = step
 
