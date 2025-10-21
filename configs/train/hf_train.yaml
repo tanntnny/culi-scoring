@@ -100,4 +100,4 @@ hf_trainer:
   
   # Deep Speed
   deepspeed_enabled: false
-  deepspeed: "configs/deepspeed/zero2.json"
+  deepspeed: "configs/deepspeed/zero2_base.json"
