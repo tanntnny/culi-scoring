@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any
+import psutil
 import torch
 import numpy as np
 from transformers import EvalPrediction
@@ -33,31 +34,24 @@ class GPUMemoryCallback(TrainerCallback):
         self.log_host_memory = bool(log_host_memory)
         self._last_logged_step = -1
 
-    def on_log(self, args, state, control, **kwargs):
+    def on_log(self, args, state, control, logs=None, **kwargs):
         # Only the main process should log to avoid duplicate entries
         try:
             if not is_global_zero():
                 return
         except Exception:
-            # If distributed utils are unavailable for any reason, proceed
             pass
 
         if not torch.cuda.is_available():
             return
 
         step = getattr(state, "global_step", None)
-        if step is None:
-            return
-        if step == self._last_logged_step:
+        if step is None or step == self._last_logged_step:
             return
         if (step % self.log_every_n_steps) != 0:
             return
 
-        trainer = kwargs.get("trainer", None)
-        if trainer is None:
-            return
-
-        logs: Dict[str, float] = {}
+        metrics: Dict[str, float] = {}
         try:
             device_count = torch.cuda.device_count()
             for idx in range(device_count):
@@ -67,24 +61,25 @@ class GPUMemoryCallback(TrainerCallback):
                 reserved = torch.cuda.memory_reserved(idx)
 
                 base = f"gpu_mem/{idx}"
-                logs[f"{base}_used_gb"] = used_bytes / (1024 ** 3)
-                logs[f"{base}_alloc_gb"] = allocated / (1024 ** 3)
-                logs[f"{base}_reserved_gb"] = reserved / (1024 ** 3)
+                metrics[f"{base}_used_gb"] = used_bytes / (1024 ** 3)
+                metrics[f"{base}_alloc_gb"] = allocated / (1024 ** 3)
+                metrics[f"{base}_reserved_gb"] = reserved / (1024 ** 3)
         except Exception:
-            # Be resilient: never break training due to logging
             pass
 
         if self.log_host_memory:
             try:
                 import psutil  # optional
                 vm = psutil.virtual_memory()
-                logs["host_mem/used_gb"] = (vm.total - vm.available) / (1024 ** 3)
-                logs["host_mem/percent"] = float(vm.percent)
+                metrics["host_mem/used_gb"] = (vm.total - vm.available) / (1024 ** 3)
+                metrics["host_mem/percent"] = float(vm.percent)
             except Exception:
                 pass
 
-        if logs:
-            trainer.log(logs)
+        if metrics and logs is not None:
+            # Inject metrics into the current log payload so they get recorded
+            logs.update(metrics)
+
         self._last_logged_step = step
 
 class HuggingFaceTrainer:
