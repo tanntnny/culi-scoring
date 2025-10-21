@@ -26,7 +26,7 @@ hf_trainer:
   lr_scheduler_type: "linear"
   
   # Training duration
-  num_train_epochs: 20
+  num_train_epochs: 5
   max_steps: -1  # If set to positive, overrides num_train_epochs
   
   # Optimization
@@ -56,16 +56,14 @@ hf_trainer:
   log_host_memory: true
   
   # Saving
-  save_strategy: "steps"
-  save_steps: 1000
-  save_total_limit: 3
-  load_best_model_at_end: true
-  metric_for_best_model: "eval_loss"
+  save_strategy: "epoch"
+  load_best_model_at_end: false
+  metric_for_best_model: null
   greater_is_better: false
   
   # Early stopping
-  early_stopping_patience: 5
-  early_stopping_threshold: 0.001
+  early_stopping_patience: null
+  early_stopping_threshold: null
   
   # Reproducibility
   seed: 42
