@@ -42,7 +42,7 @@ hf_trainer:
   
   # Evaluation
   evaluation_strategy: "steps"
-  eval_steps: 500
+  eval_steps: 100
   eval_accumulation_steps: 8
   
   # Logging
