@@ -41,9 +41,9 @@ hf_trainer:
   max_grad_norm: 1.0
   
   # Evaluation
-  evaluation_strategy: "steps"
-  eval_steps: 100
-  eval_accumulation_steps: 8
+  evaluation_strategy: "no" # Options: "no", "steps", "epoch"
+  eval_steps: null
+  eval_accumulation_steps: null
   
   # Logging
   logging_strategy: "steps"
