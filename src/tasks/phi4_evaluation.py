@@ -2,13 +2,27 @@ from transformers import (
     AutoProcessor,
     StoppingCriteriaList,
     StoppingCriteria,
-    MultipleTokenBatchStoppingCriteria,
 )
 
 import torch
 from ..interfaces.protocol import BaseTask
 from ..core.registry import register
 from ..metrics.classification import Accuracy
+
+class MultipleTokenBatchStoppingCriteria(StoppingCriteria):
+    def __init__(self, stop_tokens: torch.LongTensor, batch_size: int = 1) -> None:
+        self.stop_tokens = stop_tokens
+        self.max_stop_tokens = stop_tokens.shape[-1]
+        self.stop_tokens_idx = torch.zeros(batch_size, dtype=torch.long, device=stop_tokens.device)
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
+        generated_inputs = torch.eq(input_ids[:, -self.max_stop_tokens :].unsqueeze(1), self.stop_tokens)
+        equal_generated_inputs = torch.all(generated_inputs, dim=2)
+        sequence_idx = torch.any(equal_generated_inputs, dim=1)
+        sequence_set_mask = self.stop_tokens_idx == 0
+        self.stop_tokens_idx[sequence_idx & sequence_set_mask] = input_ids.shape[-1]
+
+        return torch.all(self.stop_tokens_idx)
 
 class Phi4EvaluationTask(BaseTask):
     def __init__(self, cfg):
