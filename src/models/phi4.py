@@ -16,7 +16,7 @@ def build_phi4mm_model(cfg):
     )
     model = PeftModel.from_pretrained(
         model,
-        cfg.model.lora_src,
+        cfg.model.lora_src if cfg.cmd == "train" else cfg.eval.checkpoint_src,
         is_trainable=(cfg.cmd == "train"),
     )
     model.set_lora_adapter("speech")

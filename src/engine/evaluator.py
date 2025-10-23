@@ -28,33 +28,6 @@ class Evaluator:
         self.task.setup(self.model)
         self.logger = Logger(Path(cfg.output_dir) / "tb_eval")
 
-        ckpt = cfg.eval.checkpoint_src
-        if ckpt:
-            ckpt_path = Path(ckpt)
-            if ckpt_path.is_dir():
-                candidates = sorted(ckpt_path.glob("epoch*.pt"))
-                if candidates:
-                    ckpt_path = candidates[-1]
-            if ckpt_path.exists():
-                state = load_checkpoint(ckpt_path)
-                state_dict = state.get("model", state)
-                load_ok = False
-                try:
-                    self.model.load_state_dict(state_dict, strict=True)
-                    load_ok = True
-                except Exception:
-                    try:
-                        new_state = {k.replace("module.", "", 1): v for k, v in state_dict.items()}
-                        self.model.load_state_dict(new_state, strict=False)
-                        load_ok = True
-                    except Exception:
-                        pass
-                if is_global_zero():
-                    if load_ok:
-                        print(f"[Evaluator] Loaded checkpoint from {ckpt_path}")
-                    else:
-                        print(f"[Evaluator] Warning: failed to load checkpoint from {ckpt_path}")
-
     def run(self):
         loader = None
         if hasattr(self.datamodule, "test_dataloader"):
