@@ -29,15 +29,11 @@ class Evaluator:
         self.logger = Logger(Path(cfg.output_dir) / "tb_eval")
 
     def run(self):
-        loader = None
-        if hasattr(self.datamodule, "test_dataloader"):
-            loader = self.datamodule.test_dataloader()
-        if loader is None and hasattr(self.datamodule, "val_dataloader"):
-            loader = self.datamodule.val_dataloader()
+        loader = self.datamodule.val_dataloader()
 
         if loader is None:
             self.accelerator.print("[Evaluator] No dataloader available (neither test nor val). Exiting.")
-            return {}
+            return
 
         if hasattr(self.datamodule, "set_epoch"):
             self.datamodule.set_epoch(0)
