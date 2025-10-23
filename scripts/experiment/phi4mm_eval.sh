@@ -15,7 +15,6 @@ source scripts/slurm/common.sh
 source scripts/slurm/hf.sh
 
 accelerate launch \
-  --config_file scripts/slurm/accelerate_config.yaml \
   --multi_gpu \
   --num_processes "${SLURM_GPUS_ON_NODE:-4}" \
   --mixed_precision bf16 \
