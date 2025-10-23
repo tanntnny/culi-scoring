@@ -16,6 +16,8 @@ source scripts/slurm/hf.sh
 
 accelerate launch \
   --multi_gpu \
+  --num_machines 1 \
+  --dynamo_backend no \
   --num_processes "${SLURM_GPUS_ON_NODE:-4}" \
   --mixed_precision bf16 \
   -m src.main \
