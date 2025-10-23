@@ -1,2 +1,2 @@
-checkpoint_src: "saves/phi4mm-last-1
+checkpoint_src: "saves/phi4mm-last-1"
 log_steps: 10
