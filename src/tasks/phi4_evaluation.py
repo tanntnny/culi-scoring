@@ -29,7 +29,10 @@ class Phi4EvaluationTask(BaseTask):
         self.cfg = cfg
 
     def setup(self, model):
-        self.processor = AutoProcessor.from_pretrained(self.cfg.model.processor_src)
+        self.processor = AutoProcessor.from_pretrained(
+            self.cfg.model.processor_src,
+            trust_remote_code=True,
+        )
         self.stop_tokens = ["<|end|>", self.processor.tokenizer.eos_token]
         self.stop_tokens_ids = self.processor.tokenizer(
             self.stop_tokens,
