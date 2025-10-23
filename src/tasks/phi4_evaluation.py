@@ -44,39 +44,64 @@ class Phi4EvaluationTask(BaseTask):
         self.all_labels = []
         self.metrics = Accuracy()
     
+    def _to_device(self, x, device):
+        if isinstance(x, torch.Tensor):
+            return x.to(device)
+        if isinstance(x, dict):
+            return {k: self._to_device(v, device) for k, v in x.items()}
+        return x
+
     def validation_step(self, batch, model):
-        stopping_criteria = StoppingCriteriaList(
-            [MultipleTokenBatchStoppingCriteria(
-                self.stop_tokens_ids,
-                batch_size=batch["input_ids"].shape[0],
-            )]
-        )
-        inputs = inputs.to(model.device)
+        # 1) Move to device
+        inputs = self._to_device(batch, model.device)
+
+        # 2) Build stop criteria for this batch size
+        bsz = inputs["input_ids"].shape[0]
+        stopping = MultipleTokenBatchStoppingCriteria(self.stop_tokens_ids, batch_size=bsz)
+        stopping_criteria = StoppingCriteriaList([stopping])
+
+        # 3) Generate
+        gen_kwargs = {k: v for k, v in inputs.items() if k != "labels"}
         generated_ids = model.generate(
-            **inputs,
+            **gen_kwargs,
             eos_token_id=self.processor.tokenizer.eos_token_id,
             max_new_tokens=self.cfg.model.max_new_tokens,
             stopping_criteria=stopping_criteria,
         )
-        stop_tokens_idx = stopping_criteria[0].stop_tokens_idx.reshape(inputs.input_ids.shape[0], -1)[:, 0]
+
+        # 4) Cut off at custom stop tokens (if seen)
+        stop_tokens_idx = stopping.stop_tokens_idx.reshape(bsz, -1)[:, 0]
         stop_tokens_idx = torch.where(
             stop_tokens_idx > 0,
             stop_tokens_idx - self.stop_tokens_ids.shape[-1],
             generated_ids.shape[-1],
         )
+
+        # 5) Decode only the newly generated part (after the prompt)
+        tok = self.processor.tokenizer
+        prompt_len = inputs["input_ids"].shape[1]
         generated_text = [
-            self.processor.decode(_pred_ids[inputs["input_ids"].shape[1] : _stop_tokens_idx], skip_special_tokens=True, clean_up_tokenization_spaces=False)
-            for _pred_ids, _stop_tokens_idx in zip(generated_ids, stop_tokens_idx)
+            tok.decode(ids[prompt_len:stop_idx], skip_special_tokens=True, clean_up_tokenization_spaces=False)
+            for ids, stop_idx in zip(generated_ids, stop_tokens_idx)
         ]
         self.all_generated_texts.extend(generated_text)
-        labels = [self.processor.decode(_label_ids[_label_ids != 0]).removesuffix(self.cfg.model.answer_suffix) for _label_ids in inputs["labels"]]
+
+        # 6) Recover label strings from masked labels (mask value = -100 in collator)
+        if "labels" in inputs:
+            labels = [
+                tok.decode(lbl[lbl != -100], skip_special_tokens=True)
+                .removesuffix(self.cfg.model.answer_suffix)
+                for lbl in inputs["labels"]
+            ]
+        else:
+            labels = [""] * bsz
         self.all_labels.extend(labels)
-        
+
         return {
             "generated_texts": generated_text,
-            "labels": labels,
+            "labels": labels
         }
-    
+        
     def reduce(self,):
         return {
             "generated_texts": self.all_generated_texts,
