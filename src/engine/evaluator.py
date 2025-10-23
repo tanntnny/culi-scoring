@@ -1,14 +1,27 @@
 from __future__ import annotations
 from pathlib import Path
+import os
 import torch
+from accelerate import Accelerator
 from ..core.registry import build
 from ..core.logging import Logger
 from ..core.io import load_checkpoint
+from ..core.distributed import is_global_zero, is_dist
+from .loop import validate
 
 class Evaluator:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        amp_cfg = getattr(cfg.train, "amp", False)
+        if isinstance(amp_cfg, bool):
+            mixed_precision = "fp16" if amp_cfg else "no"
+        else:
+            amp_str = str(amp_cfg).lower()
+            mixed_precision = "bf16" if "bf16" in amp_str else ("fp16" if "fp16" in amp_str or amp_str == "true" else "no")
+        self.accelerator = Accelerator(mixed_precision=mixed_precision)
+        self.device = self.accelerator.device
+
         self.datamodule = build("data", cfg.data.name, cfg=cfg)
         self.model = build("model", cfg.model.name, cfg=cfg).to(self.device)
         self.task = build("task", cfg.task.name, cfg=cfg)
@@ -16,18 +29,54 @@ class Evaluator:
         self.logger = Logger(Path(cfg.output_dir) / "tb_eval")
 
         ckpt = cfg.eval.checkpoint_src
-        if ckpt is not None and Path(ckpt).exists():
-            state = load_checkpoint(Path(ckpt))
-            self.model.load_state_dict(state["model"])
+        if ckpt:
+            ckpt_path = Path(ckpt)
+            if ckpt_path.is_dir():
+                candidates = sorted(ckpt_path.glob("epoch*.pt"))
+                if candidates:
+                    ckpt_path = candidates[-1]
+            if ckpt_path.exists():
+                state = load_checkpoint(ckpt_path)
+                state_dict = state.get("model", state)
+                load_ok = False
+                try:
+                    self.model.load_state_dict(state_dict, strict=True)
+                    load_ok = True
+                except Exception:
+                    try:
+                        new_state = {k.replace("module.", "", 1): v for k, v in state_dict.items()}
+                        self.model.load_state_dict(new_state, strict=False)
+                        load_ok = True
+                    except Exception:
+                        pass
+                if is_global_zero():
+                    if load_ok:
+                        print(f"[Evaluator] Loaded checkpoint from {ckpt_path}")
+                    else:
+                        print(f"[Evaluator] Warning: failed to load checkpoint from {ckpt_path}")
 
     def run(self):
-        loader = self.datamodule.val_dataloader()
-        self.model.eval()
-        for idx, batch in enumerate(loader):
-            with torch.no_grad():
-                validation_out = self.task.validation_step(batch, self.model)
-            if idx % self.cfg.eval.log_steps == 0:
-                print(f"Eval Step {idx}/{len(loader)} completed.")
-                print(f"Sample Output: {validation_out}")
+        loader = None
+        if hasattr(self.datamodule, "test_dataloader"):
+            loader = self.datamodule.test_dataloader()
+        if loader is None and hasattr(self.datamodule, "val_dataloader"):
+            loader = self.datamodule.val_dataloader()
 
-        self.logger.close()
+        if loader is None:
+            self.accelerator.print("[Evaluator] No dataloader available (neither test nor val). Exiting.")
+            return {}
+
+        if hasattr(self.datamodule, "set_epoch"):
+            self.datamodule.set_epoch(0)
+
+        self.model, loader = self.accelerator.prepare(self.model, loader)
+
+        try:
+            metrics = validate(self.model, self.task, loader, self.device, self.logger, global_step=0)
+            self.accelerator.wait_for_everyone()
+            if self.accelerator.is_local_main_process:
+                printable = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
+                print(f"[Evaluator] Completed. Metrics: {printable}")
+            return metrics
+        finally:
+            self.logger.close()
