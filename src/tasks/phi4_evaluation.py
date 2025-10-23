@@ -3,6 +3,7 @@ from transformers import (
     StoppingCriteriaList,
     StoppingCriteria,
 )
+from accelerate.utils import unwrap_model
 
 import torch
 from ..interfaces.protocol import BaseTask
@@ -53,6 +54,7 @@ class Phi4EvaluationTask(BaseTask):
 
     def validation_step(self, batch, model):
         # 1) Move to device
+        model = unwrap_model(model)
         inputs = self._to_device(batch, model.device)
 
         # 2) Build stop criteria for this batch size
