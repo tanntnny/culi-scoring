@@ -14,7 +14,7 @@
 source scripts/slurm/common.sh
 source scripts/slurm/hf.sh
 
-python -m
+python -m \
   src.main \
   cmd=eval \
   eval=phi4mm_eval \
