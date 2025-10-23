@@ -1,6 +1,10 @@
 name: phi4
 src: models/phi4/phi4-model
+processor_src: models/phi4/phi4-processor
 lora_src: models/phi4/phi4-model/speech-lora
 torch_dtype: bfloat16
 use_flash_attention: true
 gradient_checkpointing: true
+
+max_new_tokens: 64
+answer_suffix: "<|end|><|endoftext|>"
