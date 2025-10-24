@@ -107,17 +107,19 @@ class Phi4EvaluationTask(BaseTask):
         else:
             labels = [""] * bsz
         self.all_labels.extend(labels)
+        self.metrics.update(generated_text, labels)
+        
+        print(f"Generated texts: {generated_text}")
+        print(f"Labels: {labels}")
 
         return {
-            "generated_texts": generated_text,
-            "labels": labels
+            "val/loss": 0.0,
         }
         
     def reduce(self,):
-        return {
-            "generated_texts": self.all_generated_texts,
-            "labels": self.all_labels,
-        }
+        metrics = self.metrics.compute()
+        self.metrics.reset()
+        return metrics
 
 @register("task", "phi4_evaluation")
 def build_phi4_evaluation_task(cfg):
