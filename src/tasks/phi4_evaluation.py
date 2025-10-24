@@ -107,7 +107,6 @@ class Phi4EvaluationTask(BaseTask):
         else:
             labels = [""] * bsz
         self.all_labels.extend(labels)
-        self.metrics.update(generated_text, labels)
         
         print(f"Generated texts: {generated_text}")
         print(f"Labels: {labels}")
