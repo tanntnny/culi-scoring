@@ -8,3 +8,4 @@ gradient_checkpointing: true
 
 max_new_tokens: 64
 answer_suffix: "<|end|><|endoftext|>"
+num_logits_to_keep: 1

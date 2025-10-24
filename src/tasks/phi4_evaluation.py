@@ -77,6 +77,7 @@ class Phi4EvaluationTask(BaseTask):
             eos_token_id=self.processor.tokenizer.eos_token_id,
             max_new_tokens=self.cfg.model.max_new_tokens,
             stopping_criteria=stopping_criteria,
+            num_logits_to_keep=self.cfg.model.num_logits_to_keep,
         )
 
         # 4) Cut off at custom stop tokens (if seen)
