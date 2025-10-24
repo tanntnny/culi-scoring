@@ -21,8 +21,7 @@ class MultipleTokenBatchStoppingCriteria(StoppingCriteria):
         sequence_idx = torch.any(equal_generated_inputs, dim=1)
         sequence_set_mask = self.stop_tokens_idx == 0
         self.stop_tokens_idx[sequence_idx & sequence_set_mask] = input_ids.shape[-1]
-
-        return torch.all(self.stop_tokens_idx)
+        return (self.stop_tokens_idx > 0).all().item()
 
 class Phi4EvaluationTask(BaseTask):
     def __init__(self, cfg):
@@ -50,10 +49,20 @@ class Phi4EvaluationTask(BaseTask):
         if isinstance(x, dict):
             return {k: self._to_device(v, device) for k, v in x.items()}
         return x
+    
+    def _unwrap_for_generate(self, model):
+        m = getattr(model, "module", model)
+        if hasattr(m, "get_base_model"):
+            try:
+                m = m.get_base_model()
+            except TypeError:
+                m = getattr(m, "base_model", m)
+        return m
+
 
     def validation_step(self, batch, model):
         # 1) Move to device
-        model = getattr(model, "module", model)
+        model = self._unwrap_for_generate(model)
         inputs = self._to_device(batch, model.device)
 
         # 2) Build stop criteria for this batch size
