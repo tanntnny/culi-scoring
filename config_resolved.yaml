@@ -1,0 +1,42 @@
+seed: 123
+paths:
+  project_root: .
+  data_dir: data
+  raw_data_dir: ${paths.data_dir}/raw
+  interim_data_dir: ${paths.data_dir}/interim
+  processed_data_dir: ${paths.data_dir}/processed
+  reports_dir: reports
+  figures_dir: ${paths.reports_dir}/figures
+  tables_dir: ${paths.reports_dir}/tables
+  outputs_dir: outputs
+mode:
+  name: train
+data:
+  _target_: src.datamodules.example.ExampleDataModule
+  batch_size: 32
+  num_workers: 0
+model:
+  _target_: src.models.example.ExampleModel
+  input_dim: 10
+  hidden_dim: 16
+  output_dim: 1
+loss:
+  _target_: src.losses.example.ExampleLoss
+metrics:
+  _target_: src.metrics.example.ExampleMetric
+optimizer:
+  _target_: src.optimizers.example.ExampleOptimizer
+  lr: 0.001
+trainer:
+  max_epochs: 1
+  max_steps: -1
+  precision: 32
+  accelerator: cpu
+  gradient_accumulation_steps: 1
+  val_check_interval: 1.0
+callbacks:
+  _target_: src.callbacks.example.ExampleCallbacks
+logger:
+  _target_: src.logger.example.ExampleLogger
+experiment:
+  name: baseline

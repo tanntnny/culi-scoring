@@ -1,0 +1,4 @@
+_target_: src.models.example.ExampleModel
+input_dim: 10
+hidden_dim: 16
+output_dim: 1

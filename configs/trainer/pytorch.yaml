@@ -1,0 +1,7 @@
+_target_: src.trainers.pytorch_trainer.PytorchTrainer
+max_epochs: 1
+max_steps: -1
+precision: 32
+accelerator: "cpu"
+gradient_accumulation_steps: 1
+val_check_interval: 1.0
