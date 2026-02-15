@@ -1,0 +1,10 @@
+_target_: src.evaluators.structured_score_evaluator.StructuredScoreEvaluator
+batch_size: 1
+num_workers: 0
+max_eval_batches: -1
+logging_steps: 10
+num_beams: 1
+max_new_tokens: 64
+num_logits_to_keep: null
+assistant_start_string: null
+repetition_penalty: 1.2

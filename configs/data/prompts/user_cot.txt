@@ -1,0 +1,46 @@
+Analyze the proficiency of the student's speech below.
+
+### REFERENCE EXAMPLES
+
+**Example 1 (Score 0)**
+Input: "My... hobby is... football. Play friend. Good."
+Output:
+{
+  "features": "Fragmented syntax. Speaker relies on isolated words and cannot sustain a full sentence.",
+  "score": 0
+}
+
+**Example 2 (Score 1)**
+Input: "I like the job because it is good and I get money. I buy food and I help my mother so I am happy."
+Output:
+{
+  "features": "Fluent flow, BUT relies entirely on simple connectors ('and', 'so') and concrete vocabulary. Lacks logical paragraph structure.",
+  "score": 1
+}
+
+**Example 3 (Score 2)**
+Input: "Working part-time is useful. However, students must be careful. If they work too much, they cannot study."
+Output:
+{
+  "features": "Uses logical transitions ('However', 'If') to organize ideas. Sentences are correct, but vocabulary remains basic/concrete.",
+  "score": 2
+}
+
+**Example 4 (Score 3)**
+Input: "While financial independence is crucial, the potential detriment to academic focus cannot be ignored."
+Output:
+{
+  "features": "Demonstrates complex subordination ('While...', passive voice) and uses abstract vocabulary ('detriment', 'crucial').",
+  "score": 3
+}
+
+### TARGET INPUT
+Input Audio: <|AUDIO|>
+{transcript}
+
+**COMMAND:**
+1. Do NOT output the transcript.
+2. In the "features" field, explicitly state if the speech is **Linear** (Score 1) or **Structured** (Score 2).
+3. Output ONLY the valid JSON.
+
+Generate JSON response:

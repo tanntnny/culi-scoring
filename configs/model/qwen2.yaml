@@ -1,0 +1,5 @@
+_target_: src.models.qwen2.Qwen2Model
+src: models/qwen2-audio-instruct
+processor_src: models/qwen2-audio-instruct
+fp16: true
+use_flash_attention: false

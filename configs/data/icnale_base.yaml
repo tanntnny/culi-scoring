@@ -1,0 +1,13 @@
+_target_: src.datamodules.icnale.ICNALEDataModule
+train_csv: datasets/processed/SM-preprocessed/fold_0_train.csv
+val_csv: datasets/processed/SM-preprocessed/fold_0_val.csv
+test_csv: null
+processor_src: ${model.processor_src}
+system_instruction: "You are an automated speech proficiency grader. Your job is to listen to the provided audio and output a single integer from 0 to 3 representing the speaker's English speaking proficiency. Follow this rubric: 0 = Very low proficiency, 1 = Basic proficiency, 2 = Moderate proficiency, 3 = High proficiency Evaluate based on pronunciation clarity, fluency and smoothness, grammar correctness, vocabulary range and appropriateness. Overall understandability Your output MUST be only one number: 0, 1, 2, or 3. Do not include any explanation or extra text."
+user_instruction: "Evaluate the given audio: "
+use_half_audio: false
+use_text_features: false
+half_audio_threshold: 40.0
+assistant_start_string: null
+batch_size: 1
+num_workers: 0

@@ -1,0 +1,13 @@
+_target_: src.datamodules.icnale.ICNALEDataModule
+train_csv: datasets/processed/SM-preprocessed/fold_0_train.csv
+val_csv: datasets/processed/SM-preprocessed/fold_0_val.csv
+test_csv: null
+processor_src: ${model.processor_src}
+system_instruction: configs/data/prompts/system_cot.txt
+user_instruction: configs/data/prompts/user_cot.txt
+use_half_audio: false
+use_text_features: true
+half_audio_threshold: 40.0
+assistant_start_string: '{"features":'
+batch_size: 1
+num_workers: 0

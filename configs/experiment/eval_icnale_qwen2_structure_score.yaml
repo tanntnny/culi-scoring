@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - override /data: icnale_cot
+  - override /model: qwen2
+  - override /evaluator: structured_score
+
+name: eval_icnale_qwen2_structure_score
+
+evaluator:
+  batch_size: 1
+  num_workers: 0
+  max_eval_batches: -1
+  logging_steps: 100
+  num_beams: 2
+  max_new_tokens: 256
+  assistant_start_string: ${data.assistant_start_string}
