@@ -27,3 +27,10 @@ Trainer options
 Development
 - Install: pip install -e .[dev]
 - Tests: pytest
+
+Slurm examples
+- Base setup scripts: `scripts/slurm/common.sh`, `scripts/slurm/hf.sh`, `scripts/slurm/deepspeed.sh`
+- Example train job: `sbatch scripts/experiment/train_hf_example.sh`
+- Example eval job: `RUN_DIR=outputs/<run_id> sbatch scripts/experiment/eval_hf_example.sh`
+- Modules and conda are disabled by default. Enable when needed:
+  `ENABLE_MODULES=1 MODULE_MAMBA=<module> MODULE_CUDA=<module> MODULE_GCC=<module> ENABLE_CONDA=1 CONDA_ENV=<env> sbatch ...`
