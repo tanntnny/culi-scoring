@@ -9,6 +9,9 @@ defaults:
   - optimizer: example
   - scheduler: null
   - trainer: default
+  - evaluator: default
+  - preparer: default
+  - reporter: default
   - callbacks: default
   - logger: default
   - experiment: null
